@@ -1084,7 +1084,12 @@ function JNILoadClass(jenv, classSig, opt_props) {
       for (i=0; i<arguments.length; i++) {
         args.push(unwrap(arguments[i], jenv, argctypes[i]));
       }
-      return wrap(j[call].apply(j, args), nm);
+      Cu.reportError("PMJCL staticcall " + call + " name=" + mtd.name +
+        " jenv=" + jenv + " jcls=" + jcls + " jmtd=" + jmtd +
+        " fn=" + j[call] + " nargs=" + args.length);
+      var res = j[call].apply(j, args);
+      Cu.reportError("PMJCL staticcall done res=" + res);
+      return wrap(res, nm);
     };
   });
   (props.constructors || []).forEach(function(mtd) {

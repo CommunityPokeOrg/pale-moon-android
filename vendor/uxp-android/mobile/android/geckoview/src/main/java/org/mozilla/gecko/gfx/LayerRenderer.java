@@ -246,6 +246,7 @@ public class LayerRenderer {
                     }
                 });
                 mView.setPaintState(LayerView.PAINT_AFTER_FIRST);
+                android.util.Log.i("PMSURF", "endDrawing cleared surface background");
             }
             mLastFrameTime = mFrameStartTime;
         }

@@ -3473,14 +3473,19 @@ Tab.prototype = {
         this.id = aParams.tabID;
         stub = true;
       } else {
+        Cu.reportError("PMJCL TabJNI: enter");
         let jenv = JNI.GetForThread();
+        Cu.reportError("PMJCL TabJNI: got env " + jenv);
         let jTabs = JNI.LoadClass(jenv, "org.mozilla.gecko.Tabs", {
           static_methods: [
             { name: "getNextTabId", sig: "()I" }
           ],
         });
+        Cu.reportError("PMJCL TabJNI: class loaded");
         this.id = jTabs.getNextTabId();
+        Cu.reportError("PMJCL TabJNI: id=" + this.id);
         JNI.UnloadClasses(jenv);
+        Cu.reportError("PMJCL TabJNI: done");
       }
 
       this.desktopMode = ("desktopMode" in aParams) ? aParams.desktopMode : false;

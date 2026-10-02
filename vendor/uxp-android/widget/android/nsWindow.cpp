@@ -1060,6 +1060,13 @@ public:
     void AttachToJava(jni::Object::Param aClient, jni::Object::Param aNPZC)
     {
         MOZ_ASSERT(NS_IsMainThread());
+        {
+            int wType = -1;
+            if (LockedWindowPtr w{mWindow}) { wType = (int)w->mWindowType; }
+            ALOG("PMCOMP AttachToJava mWindow=%d winPtr=%p wType=%d",
+                 mWindow ? 1 : 0,
+                 mWindow ? (void*)&*mWindow : nullptr, wType);
+        }
         if (!mWindow) {
             return; // Already shut down.
         }
@@ -1112,8 +1119,12 @@ public:
         MOZ_ASSERT(NS_IsMainThread());
         MOZ_ASSERT(mWindow);
 
+        ALOG("PMCOMP CreateCompositor w=%d h=%d surface=%p mWindow=%d",
+             aWidth, aHeight, aSurface.Get(), mWindow ? 1 : 0);
         mSurface = aSurface;
         mWindow->CreateLayerManager(aWidth, aHeight);
+        ALOG("PMCOMP CreateLayerManager done layerManager=%p",
+             (void*)mWindow->mLayerManager.get());
 
         mCompositorPaused = false;
         OnResumedCompositor();
@@ -1162,7 +1173,11 @@ public:
             bridge = window->GetCompositorBridgeParent();
         }
 
+        void* oldSurf = mSurface ? mSurface.Get() : nullptr;
+        void* newSurf = aSurface ? aSurface.Get() : nullptr;
         mSurface = aSurface;
+        ALOG("PMCOMP SyncResumeResizeCompositor oldSurface=%p newSurface=%p w=%d h=%d",
+             oldSurf, newSurf, aWidth, aHeight);
 
         if (!bridge || !bridge->ScheduleResumeOnCompositorThread(aWidth,
                                                                  aHeight)) {
@@ -1357,8 +1372,9 @@ nsWindow::GeckoViewSupport::Open(const jni::Class::LocalRef& aCls,
 
     const auto window = static_cast<nsWindow*>(widget.get());
     window->SetScreenId(aScreenId);
-
-    // Attach a new GeckoView support object to the new window.
+    ALOG("PMCOMP Open widget=%p type=%d domWindow=%p chromeURI=%s",
+         (void*)widget.get(), (int)window->mWindowType,
+         (void*)domWindow.get(), url.get());
     window->mGeckoViewSupport  = mozilla::MakeUnique<GeckoViewSupport>(
             window, GeckoView::Window::LocalRef(aCls.Env(), aWindow), aView);
 
@@ -1527,8 +1543,9 @@ nsWindow::Create(nsIWidget* aParent,
                  const LayoutDeviceIntRect& aRect,
                  nsWidgetInitData* aInitData)
 {
-    ALOG("nsWindow[%p]::Create %p [%d %d %d %d]", (void*)this, (void*)aParent,
-         aRect.x, aRect.y, aRect.width, aRect.height);
+    ALOG("nsWindow[%p]::Create %p [%d %d %d %d] type=%d", (void*)this, (void*)aParent,
+         aRect.x, aRect.y, aRect.width, aRect.height,
+         aInitData ? (int)aInitData->mWindowType : -1);
 
     nsWindow *parent = (nsWindow*) aParent;
     if (aNativeParent) {
@@ -3492,6 +3509,11 @@ nsWindow::SynthesizeNativeMouseMove(LayoutDeviceIntPoint aPoint,
 bool
 nsWindow::PreRender(WidgetRenderingContext* aContext)
 {
+    static int sPreRender = 0;
+    if (++sPreRender <= 5 || sPreRender % 60 == 0) {
+        ALOG("PMCOMP PreRender #%d destroyed=%d compositor=%p",
+             sPreRender, (int)Destroyed(), (void*)aContext->mCompositor);
+    }
     if (Destroyed()) {
         return true;
     }
@@ -3531,6 +3553,11 @@ nsWindow::DrawWindowUnderlay(WidgetRenderingContext* aContext,
 
     LayerRenderer::Frame::LocalRef frame = client->CreateFrame();
     mLayerRendererFrame = frame;
+    static int sFrameLog = 0;
+    if (++sFrameLog <= 5 || sFrameLog % 60 == 0) {
+        ALOG("PMCOMP DrawUnderlay #%d frame=%p paintsBg=%d",
+             sFrameLog, (void*)frame.Get(), (int)WidgetPaintsBackground());
+    }
     if (NS_WARN_IF(!mLayerRendererFrame)) {
         return;
     }
@@ -3579,7 +3606,20 @@ nsWindow::NeedsPaint()
     if (!mLayerViewSupport || mLayerViewSupport->CompositorPaused() ||
             // FindTopLevel() != nsWindow::TopWindow() ||
             !GetLayerManager(nullptr)) {
+        static int sNpFail = 0;
+        if (++sNpFail <= 5) {
+            ALOG("PMCOMP NeedsPaint false this=%p lvs=%d paused=%d lm=%p type=%d",
+                 (void*)this,
+                 mLayerViewSupport ? 1 : 0,
+                 mLayerViewSupport ? (int)mLayerViewSupport->CompositorPaused() : -1,
+                 (void*)GetLayerManager(nullptr), (int)mWindowType);
+        }
         return false;
+    }
+    static int sNpOk = 0;
+    if (++sNpOk <= 5) {
+        ALOG("PMCOMP NeedsPaint visible=%d this=%p type=%d",
+             (int)nsIWidget::NeedsPaint(), (void*)this, (int)mWindowType);
     }
     return nsIWidget::NeedsPaint();
 }

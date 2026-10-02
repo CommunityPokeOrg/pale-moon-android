@@ -93,7 +93,11 @@
     <style name="Gecko.App" parent="GeckoAppBase">
         <item name="android:gridViewStyle">@style/Widget.GridView</item>
         <item name="android:spinnerStyle">@style/Widget.Spinner</item>
-        <item name="android:windowBackground">@android:color/white</item>
+        <!-- The opaque window background paints over the SurfaceView's
+             surface region in the window buffer on BLAST-era Android, hiding
+             the Gecko-composited content. Keep the window background
+             transparent so the below-window surface shows through. -->
+        <item name="android:windowBackground">@android:color/transparent</item>
         <item name="bookmarksListViewStyle">@style/Widget.BookmarksListView</item>
         <item name="tabGridLayoutViewStyle">@style/Widget.TabsGridLayout</item>
         <item name="geckoMenuListViewStyle">@style/Widget.GeckoMenuListView</item>

@@ -63,6 +63,7 @@ public class LayerView extends FrameLayout {
     private final Overscroll mOverscroll;
 
     private boolean mServerSurfaceValid;
+    private boolean mForcedSurfaceRecreate;
     private int mWidth, mHeight;
 
     private boolean onAttachedToWindowCalled;
@@ -321,7 +322,17 @@ public class LayerView extends FrameLayout {
             setWillNotCacheDrawing(false);
 
             mSurfaceView = new LayerSurfaceView(getContext(), this);
-            mSurfaceView.setBackgroundColor(Color.WHITE);
+            // BLAST-era Android: the below-window surface is not reliably
+            // composited through the app window here (the window's surface
+            // region stays covered), so composite the Gecko surface on top of
+            // the window for now. LayerView's show/hide machinery keeps the
+            // surface hidden until content paints. TODO: restore the normal
+            // below-window ordering once the window-region punch works.
+            mSurfaceView.setZOrderOnTop(true);
+            // BLAST-era Android: an opaque background drawn into the app window
+            // covers the SurfaceView's surface. Keep it transparent so the
+            // Gecko-composited surface is visible.
+            mSurfaceView.setBackgroundColor(Color.TRANSPARENT);
             addView(mSurfaceView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
             SurfaceHolder holder = mSurfaceView.getHolder();
@@ -449,6 +460,7 @@ public class LayerView extends FrameLayout {
             // the compositor resuming, so that Gecko knows that it can now draw.
             // It is important to not notify Gecko until after the compositor has
             // been resumed, otherwise Gecko may send updates that get dropped.
+            android.util.Log.i("PMSURF", "updateCompositor resumeResize surface=" + getSurface());
             mCompositor.syncResumeResizeCompositor(mWidth, mHeight, getSurface());
             return;
         }
@@ -457,7 +469,27 @@ public class LayerView extends FrameLayout {
         // two conditions are satisfied, we can be relatively sure that the compositor creation will
         // happen without needing to block anywhere.
         if (mServerSurfaceValid && getLayerClient().isGeckoReady()) {
+            // On BLAST-era Android the SurfaceView's layer subtree can be
+            // orphaned by WindowManager when its BLAST sync timed out while
+            // the UI thread was still busy in Gecko init. Buffers then latch
+            // into a dead layer and nothing reaches the screen. Force a
+            // surface destroy/create cycle so WMS re-registers a live
+            // subtree; the following surfaceChanged will call us again and
+            // create the compositor against the fresh surface.
+            if (mSurfaceView != null && !mForcedSurfaceRecreate) {
+                mForcedSurfaceRecreate = true;
+                android.util.Log.i("PMSURF", "forcing surface recreate");
+                mSurfaceView.setVisibility(View.GONE);
+                mSurfaceView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSurfaceView.setVisibility(View.VISIBLE);
+                    }
+                });
+                return;
+            }
             mCompositorCreated = true;
+            android.util.Log.i("PMSURF", "updateCompositor createCompositor surface=" + getSurface());
             mCompositor.createCompositor(mWidth, mHeight, getSurface());
         }
     }
@@ -487,6 +519,7 @@ public class LayerView extends FrameLayout {
         }
 
         if (mCompositorCreated) {
+            android.util.Log.i("PMSURF", "onSizeChanged resumeResize surface=" + getSurface());
             mCompositor.syncResumeResizeCompositor(width, height, getSurface());
         }
 
@@ -526,6 +559,7 @@ public class LayerView extends FrameLayout {
             mCompositor.syncPauseCompositor();
         }
 
+        android.util.Log.i("PMSURF", "serverSurfaceDestroyed created=" + mCompositorCreated);
         mServerSurfaceValid = false;
     }
 
@@ -567,15 +601,18 @@ public class LayerView extends FrameLayout {
         @Override
         public void surfaceChanged(SurfaceHolder holder, int format, int width,
                                                 int height) {
+            android.util.Log.i("PMSURF", "surfaceChanged " + width + "x" + height + " surface=" + holder.getSurface());
             onSizeChanged(width, height);
         }
 
         @Override
         public void surfaceCreated(SurfaceHolder holder) {
+            android.util.Log.i("PMSURF", "surfaceCreated surface=" + holder.getSurface());
         }
 
         @Override
         public void surfaceDestroyed(SurfaceHolder holder) {
+            android.util.Log.i("PMSURF", "surfaceDestroyed surface=" + holder.getSurface());
             onDestroyed();
         }
     }

@@ -380,6 +380,675 @@ index 34587ade8d..5d712abce2 100644
      EXPORTS.cairo += [
          'cairo-pdf.h',
      ]
+diff --git a/gfx/gl/GLContextProviderEGL.cpp b/gfx/gl/GLContextProviderEGL.cpp
+index 068146ac54..8625184021 100644
+--- a/gfx/gl/GLContextProviderEGL.cpp
++++ b/gfx/gl/GLContextProviderEGL.cpp
+@@ -11,6 +11,17 @@
+     #define GET_NATIVE_WINDOW(aWidget) ((EGLNativeWindowType)aWidget->GetNativeData(NS_NATIVE_WINDOW))
+ #endif
+ 
++#ifdef MOZ_WIDGET_ANDROID
++    #include <android/native_window.h>
++    #include <android/native_window_jni.h>
++    #include <android/log.h>
++    #include "mozilla/jni/Utils.h"
++    #define GET_JAVA_SURFACE(aWidget) (aWidget->GetNativeData(NS_JAVA_SURFACE))
++    #define PMEGL(...) __android_log_print(ANDROID_LOG_INFO, "GeckoEGL", __VA_ARGS__)
++#else
++    #define PMEGL(...) do {} while (0)
++#endif
++
+ #if defined(XP_UNIX)
+ 
+     #if defined(MOZ_X11)
+@@ -200,8 +211,29 @@ CreateSurfaceForWindow(nsIWidget* widget, const EGLConfig& config) {
+     EGLSurface newSurface = nullptr;
+ 
+     MOZ_ASSERT(widget);
++#ifdef MOZ_WIDGET_ANDROID
++    void* javaSurface = GET_JAVA_SURFACE(widget);
++    PMEGL("CreateSurfaceForWindow widget=%p javaSurface=%p",
++          (void*)widget, javaSurface);
++    if (!javaSurface) {
++        // The LayerView surface is not available yet (e.g. compositor created
++        // before the Java side attached it); caller retries on resume.
++        return nullptr;
++    }
++    JNIEnv* const env = jni::GetEnvForThread();
++    ANativeWindow* const nativeWindow = ANativeWindow_fromSurface(
++            env, reinterpret_cast<jobject>(javaSurface));
++    PMEGL("CreateSurfaceForWindow nativeWindow=%p env=%p",
++          (void*)nativeWindow, (void*)env);
++    newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(),
++                                                  config, nativeWindow, 0);
++    PMEGL("CreateSurfaceForWindow eglSurface=%p eglError=0x%x",
++          (void*)newSurface, (int)sEGLLibrary.fGetError());
++    ANativeWindow_release(nativeWindow);
++#else
+     newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config,
+                                                   GET_NATIVE_WINDOW(widget), 0);
++#endif
+     return newSurface;
+ }
+ 
+@@ -435,8 +467,12 @@ GLContextEGL::SwapBuffers()
+                           ? mSurfaceOverride
+                           : mSurface;
+     if (surface) {
+-        return sEGLLibrary.fSwapBuffers(EGL_DISPLAY(), surface);
++        bool ok = sEGLLibrary.fSwapBuffers(EGL_DISPLAY(), surface);
++        PMEGL("SwapBuffers surface=%p ok=%d err=0x%x",
++              (void*)surface, (int)ok, (int)sEGLLibrary.fGetError());
++        return ok;
+     } else {
++        PMEGL("SwapBuffers NO SURFACE");
+         return false;
+     }
+ }
+@@ -687,6 +723,18 @@ CreateConfig(EGLConfig* aConfig, nsIWidget* aWidget)
+ {
+     int32_t depth = gfxPlatform::GetPlatform()->GetScreenDepth();
+     if (!CreateConfig(aConfig, depth, aWidget)) {
++#ifdef MOZ_WIDGET_ANDROID
++        // Bug 736005
++        // Android doesn't always support 16 bit so also try 24 bit
++        if (depth == 16) {
++            return CreateConfig(aConfig, 24, aWidget);
++        }
++        // Bug 970096
++        // Some devices that have 24 bit screens only support 16 bit OpenGL?
++        if (depth == 24) {
++            return CreateConfig(aConfig, 16, aWidget);
++        }
++#endif
+         return false;
+     } else {
+         return true;
+@@ -735,12 +783,15 @@ GLContextProviderEGL::CreateForWindow(nsIWidget* aWidget, bool aForceAccelerated
+ 
+     EGLConfig config;
+     if (!CreateConfig(&config, aWidget)) {
++        PMEGL("CreateForWindow: CreateConfig failed");
+         MOZ_CRASH("GFX: Failed to create EGLConfig!\n");
+         return nullptr;
+     }
++    PMEGL("CreateForWindow: config=%p", (void*)config);
+ 
+     EGLSurface surface = mozilla::gl::CreateSurfaceForWindow(aWidget, config);
+     if (!surface) {
++        PMEGL("CreateForWindow: CreateSurfaceForWindow failed");
+         MOZ_CRASH("GFX: Failed to create EGLSurface!\n");
+         return nullptr;
+     }
+diff --git a/gfx/gl/moz.build b/gfx/gl/moz.build
+index 14dcacdce1..83aade63b4 100644
+--- a/gfx/gl/moz.build
++++ b/gfx/gl/moz.build
+@@ -16,6 +16,8 @@ elif 'gtk' in CONFIG['MOZ_WIDGET_TOOLKIT']:
+         gl_provider = 'EGL'
+     else:
+         gl_provider = 'GLX'
++elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
++    gl_provider = 'EGL'
+ 
+ if CONFIG['MOZ_GL_PROVIDER']:
+     gl_provider = CONFIG['MOZ_GL_PROVIDER']
+diff --git a/gfx/layers/client/ClientLayerManager.cpp b/gfx/layers/client/ClientLayerManager.cpp
+index 95af8fb5fc..1f8736f108 100644
+--- a/gfx/layers/client/ClientLayerManager.cpp
++++ b/gfx/layers/client/ClientLayerManager.cpp
+@@ -4,6 +4,12 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "ClientLayerManager.h"
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMTX(...) __android_log_print(ANDROID_LOG_INFO, "GeckoTX", __VA_ARGS__)
++#else
++#define PMTX(...) do {} while (0)
++#endif
+ #include "GeckoProfiler.h"              // for PROFILER_LABEL
+ #include "gfxPrefs.h"                   // for gfxPrefs::LayersTile...
+ #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
+@@ -621,6 +627,14 @@ void
+ ClientLayerManager::ForwardTransaction(bool aScheduleComposite)
+ {
+   TimeStamp start = TimeStamp::Now();
++#ifdef MOZ_WIDGET_ANDROID
++  {
++    static int sTxCount = 0;
++    if (++sTxCount <= 5 || sTxCount % 60 == 0) {
++      PMTX("ForwardTransaction #%d schedule=%d", sTxCount, (int)aScheduleComposite);
++    }
++  }
++#endif
+ 
+   // Skip the synchronization for buffer since we also skip the painting during
+   // device-reset status.
+diff --git a/gfx/layers/client/ClientPaintedLayer.cpp b/gfx/layers/client/ClientPaintedLayer.cpp
+index 150eadebf2..d240cd2f16 100644
+--- a/gfx/layers/client/ClientPaintedLayer.cpp
++++ b/gfx/layers/client/ClientPaintedLayer.cpp
+@@ -24,6 +24,13 @@
+ #include "gfx2DGlue.h"
+ #include "ReadbackProcessor.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMPL(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMPL(...)
++#endif
++
+ namespace mozilla {
+ namespace layers {
+ 
+@@ -65,6 +72,9 @@ ClientPaintedLayer::PaintThebes()
+ 
+   bool didUpdate = false;
+   RotatedContentBuffer::DrawIterator iter;
++  PMPL("ClientPaintedLayer::PaintThebes this=%p toDraw=%d,%d,%d,%d", (void*)this,
++       state.mRegionToDraw.GetBounds().x, state.mRegionToDraw.GetBounds().y,
++       state.mRegionToDraw.GetBounds().width, state.mRegionToDraw.GetBounds().height);
+   while (DrawTarget* target = mContentClient->BorrowDrawTargetForPainting(state, &iter)) {
+     if (!target || !target->IsValid()) {
+       if (target) {
+@@ -87,6 +97,41 @@ ClientPaintedLayer::PaintThebes()
+                                               ClientManager()->GetPaintedLayerCallbackData());
+ 
+     ctx = nullptr;
++
++#ifdef MOZ_WIDGET_ANDROID
++    {
++      RefPtr<SourceSurface> ss = target->Snapshot();
++      if (ss) {
++        RefPtr<DataSourceSurface> ds = ss->GetDataSurface();
++        if (ds) {
++          DataSourceSurface::MappedSurface map;
++          if (ds->Map(DataSourceSurface::READ, &map)) {
++            uint64_t sum = 0;
++            uint32_t n = 0;
++            IntSize psz = ds->GetSize();
++            for (int y = 0; y < psz.height; y += (psz.height > 32 ? psz.height / 32 : 1)) {
++              for (int x = 0; x < psz.width; x += (psz.width > 32 ? psz.width / 32 : 1)) {
++                const uint8_t* p = map.mData + y * map.mStride + x * 4;
++                sum += p[0] + p[1] + p[2] + p[3];
++                n++;
++              }
++            }
++            PMPL("PaintedPixels %dx%d stride=%d sum=%llu n=%u",
++                 psz.width, psz.height, (int)map.mStride,
++                 (unsigned long long)sum, n);
++            ds->Unmap();
++          } else {
++            PMPL("PaintedPixels map FAILED");
++          }
++        } else {
++          PMPL("PaintedPixels GetDataSurface null");
++        }
++      } else {
++        PMPL("PaintedPixels snapshot null");
++      }
++    }
++#endif
++
+     mContentClient->ReturnDrawTargetToBuffer(target);
+     didUpdate = true;
+   }
+diff --git a/gfx/layers/client/ClientTiledPaintedLayer.cpp b/gfx/layers/client/ClientTiledPaintedLayer.cpp
+index 8936dad8fe..e51d1311a6 100644
+--- a/gfx/layers/client/ClientTiledPaintedLayer.cpp
++++ b/gfx/layers/client/ClientTiledPaintedLayer.cpp
+@@ -22,6 +22,13 @@
+ #include "LayersLogging.h"
+ #include "mozilla/layers/SingleTiledContentClient.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMTP(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMTP(...)
++#endif
++
+ namespace mozilla {
+ namespace layers {
+ 
+@@ -298,6 +305,7 @@ ClientTiledPaintedLayer::RenderHighPrecision(nsIntRegion& aInvalidRegion,
+   // If we have started drawing low-precision already, then we
+   // shouldn't do anything there.
+   if (mPaintData.mLowPrecisionPaintCount != 0) {
++    PMTP("TiledRenderHP bail lowprec this=%p", (void*)this);
+     return false;
+   }
+ 
+@@ -418,6 +426,14 @@ ClientTiledPaintedLayer::RenderLayer()
+     ClientManager()->GetPaintedLayerCallback();
+   void *data = ClientManager()->GetPaintedLayerCallbackData();
+ 
++  PMTP("TiledRender enter this=%p vis=%d,%d,%d,%d valid=%d,%d,%d,%d single=%d",
++       (void*)this,
++       mVisibleRegion.GetBounds().x, mVisibleRegion.GetBounds().y,
++       mVisibleRegion.GetBounds().width, mVisibleRegion.GetBounds().height,
++       mValidRegion.GetBounds().x, mValidRegion.GetBounds().y,
++       mValidRegion.GetBounds().width, mValidRegion.GetBounds().height,
++       (int)mHaveSingleTiledContentClient);
++
+   IntSize layerSize = mVisibleRegion.ToUnknownRegion().GetBounds().Size();
+   IntSize tileSize = gfx::gfxVars::TileSize();
+   bool isHalfTileWidthOrHeight = layerSize.width <= tileSize.width / 2 ||
+@@ -480,14 +496,20 @@ ClientTiledPaintedLayer::RenderLayer()
+   nsIntRegion invalidRegion;
+   invalidRegion.Sub(neededRegion, mValidRegion);
+   if (invalidRegion.IsEmpty()) {
++    PMTP("TiledRender bail invalid-empty this=%p", (void*)this);
+     EndPaint();
+     return;
+   }
+ 
+   if (!callback) {
++    PMTP("TiledRender bail no-callback this=%p", (void*)this);
+     ClientManager()->SetTransactionIncomplete();
+     return;
+   }
++  PMTP("TiledRender paint invalid=%d,%d,%d,%d this=%p",
++       invalidRegion.GetBounds().x, invalidRegion.GetBounds().y,
++       invalidRegion.GetBounds().width, invalidRegion.GetBounds().height,
++       (void*)this);
+ 
+   if (!ClientManager()->IsRepeatTransaction()) {
+     // Only paint the mask layers on the first transaction.
+@@ -497,6 +519,7 @@ ClientTiledPaintedLayer::RenderLayer()
+     // can do the paint.
+     BeginPaint();
+     if (mPaintData.mPaintFinished) {
++      PMTP("TiledRender bail paintFinished this=%p", (void*)this);
+       return;
+     }
+ 
+@@ -530,6 +553,7 @@ ClientTiledPaintedLayer::RenderLayer()
+   bool updatedHighPrecision = RenderHighPrecision(invalidRegion,
+                                                   neededRegion,
+                                                   callback, data);
++  PMTP("TiledRender highprec updated=%d this=%p", (int)updatedHighPrecision, (void*)this);
+   if (updatedHighPrecision) {
+     ClientManager()->Hold(this);
+     mContentClient->UpdatedBuffer(TiledContentClient::TILED_BUFFER);
+@@ -544,6 +568,7 @@ ClientTiledPaintedLayer::RenderLayer()
+ 
+   // If there is nothing to draw in low-precision, then we're done.
+   if (lowPrecisionInvalidRegion.IsEmpty()) {
++    PMTP("TiledRender done lowprec-empty this=%p", (void*)this);
+     EndPaint();
+     return;
+   }
+diff --git a/gfx/layers/client/SingleTiledContentClient.cpp b/gfx/layers/client/SingleTiledContentClient.cpp
+index bcc8691cff..3e6dca8db3 100644
+--- a/gfx/layers/client/SingleTiledContentClient.cpp
++++ b/gfx/layers/client/SingleTiledContentClient.cpp
+@@ -5,6 +5,10 @@
+ 
+ #include "mozilla/layers/SingleTiledContentClient.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#endif
++
+ #include "ClientTiledPaintedLayer.h"
+ 
+ namespace mozilla {
+@@ -107,6 +111,15 @@ ClientSingleTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
+ {
+   mWasLastPaintProgressive = aIsProgressive;
+ 
++#ifdef MOZ_WIDGET_ANDROID
++  __android_log_print(ANDROID_LOG_INFO, "PMDL",
++    "SingleTile::PaintThebes enter valid=%d,%d,%d,%d paint=%d,%d,%d,%d",
++    aNewValidRegion.GetBounds().x, aNewValidRegion.GetBounds().y,
++    aNewValidRegion.GetBounds().width, aNewValidRegion.GetBounds().height,
++    aPaintRegion.GetBounds().x, aPaintRegion.GetBounds().y,
++    aPaintRegion.GetBounds().width, aPaintRegion.GetBounds().height);
++#endif
++
+   // Compare layer valid region size to current backbuffer size, discard if not matching.
+   gfx::IntSize size = aNewValidRegion.GetBounds().Size();
+   gfx::IntPoint origin = aNewValidRegion.GetBounds().TopLeft();
+@@ -236,6 +249,40 @@ ClientSingleTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
+     aCallback(&mPaintedLayer, ctx, paintRegion, paintRegion, DrawRegionClip::DRAW, nsIntRegion(), aCallbackData);
+   }
+ 
++#ifdef MOZ_WIDGET_ANDROID
++  {
++    RefPtr<gfx::DrawTarget> dtCheck = backBuffer->BorrowDrawTarget();
++    if (dtCheck) {
++      RefPtr<gfx::SourceSurface> ss = dtCheck->Snapshot();
++      if (ss) {
++        RefPtr<gfx::DataSourceSurface> ds = ss->GetDataSurface();
++        if (ds) {
++          gfx::DataSourceSurface::MappedSurface map;
++          if (ds->Map(gfx::DataSourceSurface::READ, &map)) {
++            uint64_t sum = 0;
++            uint32_t n = 0;
++            gfx::IntSize dsz = ds->GetSize();
++            for (int y = 0; y < dsz.height; y += (dsz.height > 32 ? dsz.height / 32 : 1)) {
++              for (int x = 0; x < dsz.width; x += (dsz.width > 32 ? dsz.width / 32 : 1)) {
++                const uint8_t* p = map.mData + y * map.mStride + x * 4;
++                sum += p[0] + p[1] + p[2] + p[3];
++                n++;
++              }
++            }
++            __android_log_print(ANDROID_LOG_INFO, "PMDL",
++              "TilePixels %dx%d stride=%d sum=%llu n=%u valid=%d,%d,%d,%d",
++              dsz.width, dsz.height, (int)map.mStride,
++              (unsigned long long)sum, n,
++              aNewValidRegion.GetBounds().x, aNewValidRegion.GetBounds().y,
++              aNewValidRegion.GetBounds().width, aNewValidRegion.GetBounds().height);
++            ds->Unmap();
++          }
++        }
++      }
++    }
++  }
++#endif
++
+   // Mark the area we just drew into the back buffer as invalid in the front buffer as they're
+   // now out of sync.
+   mTile.mInvalidFront.OrWith(tileDirtyRegion);
+diff --git a/gfx/layers/client/TiledContentClient.cpp b/gfx/layers/client/TiledContentClient.cpp
+index 5dad3ec65e..fdd517f163 100644
+--- a/gfx/layers/client/TiledContentClient.cpp
++++ b/gfx/layers/client/TiledContentClient.cpp
+@@ -28,6 +28,13 @@
+ #include "nsMathUtils.h"               // for NS_lroundf
+ #include "LayersLogging.h"
+ #include "UnitTransforms.h"             // for TransformTo
++
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMVT(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMVT(...)
++#endif
+ #include "mozilla/UniquePtr.h"
+ 
+ // This is the minimum area that we deem reasonable to copy from the front buffer to the
+@@ -648,6 +655,7 @@ TileClient::GetBackBuffer(CompositableClient& aCompositable,
+         CreateBackBufferTexture(mBackBuffer, aCompositable, mAllocator)
+       );
+       if (!mBackBuffer) {
++        PMVT("GetBackBuffer ALLOC FAILED");
+         DiscardBackBuffer();
+         DiscardFrontBuffer();
+         return nullptr;
+@@ -673,6 +681,9 @@ TileClient::GetBackBuffer(CompositableClient& aCompositable,
+ 
+   if (!mBackBuffer->IsLocked()) {
+     if (!mBackBuffer->Lock(OpenMode::OPEN_READ_WRITE)) {
++      PMVT("GetBackBuffer LOCK FAILED sz=%dx%d fmt=%d",
++           mBackBuffer->GetSize().width, mBackBuffer->GetSize().height,
++           (int)mBackBuffer->GetFormat());
+       gfxCriticalError() << "[Tiling:Client] Failed to lock a tile (B)";
+       DiscardBackBuffer();
+       DiscardFrontBuffer();
+@@ -755,6 +766,13 @@ ClientMultiTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
+                                          void* aCallbackData,
+                                          bool aIsProgressive)
+ {
++#ifdef MOZ_WIDGET_ANDROID
++  __android_log_print(ANDROID_LOG_INFO, "PMDL",
++    "MultiTile::PaintThebes enter paint=%d,%d,%d,%d prog=%d",
++    aPaintRegion.GetBounds().x, aPaintRegion.GetBounds().y,
++    aPaintRegion.GetBounds().width, aPaintRegion.GetBounds().height,
++    (int)aIsProgressive);
++#endif
+   TILING_LOG("TILING %p: PaintThebes painting region %s\n", &mPaintedLayer, Stringify(aPaintRegion).c_str());
+   TILING_LOG("TILING %p: PaintThebes new valid region %s\n", &mPaintedLayer, Stringify(aNewValidRegion).c_str());
+ 
+@@ -1069,6 +1087,7 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
+   mPaintedRegion.Or(mPaintedRegion, extraPainted);
+ 
+   if (!backBuffer) {
++    PMVT("ValidateTile NO BACKBUFFER origin=%d,%d", aTileOrigin.x, aTileOrigin.y);
+     return false;
+   }
+ 
+@@ -1083,9 +1102,14 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
+   }
+   moz2DTile.mTileOrigin = gfx::IntPoint(aTileOrigin.x, aTileOrigin.y);
+   if (!dt || (backBufferOnWhite && !dtOnWhite)) {
++    PMVT("ValidateTile NO DT origin=%d,%d backBuf=%p locked=%d white=%p",
++         aTileOrigin.x, aTileOrigin.y, (void*)backBuffer.get(),
++         (int)(backBuffer ? backBuffer->IsLocked() : -1),
++         (void*)backBufferOnWhite.get());
+     aTile.DiscardBuffers();
+     return false;
+   }
++  PMVT("ValidateTile OK origin=%d,%d dt=%p", aTileOrigin.x, aTileOrigin.y, (void*)dt);
+ 
+   mMoz2DTiles.push_back(moz2DTile);
+   mTilingOrigin.x = std::min(mTilingOrigin.x, moz2DTile.mTileOrigin.x);
+diff --git a/gfx/layers/composite/LayerManagerComposite.cpp b/gfx/layers/composite/LayerManagerComposite.cpp
+index fde5eb1c57..c97c30310d 100644
+--- a/gfx/layers/composite/LayerManagerComposite.cpp
++++ b/gfx/layers/composite/LayerManagerComposite.cpp
+@@ -883,6 +883,8 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
+   mozilla::widget::WidgetRenderingContext widgetContext;
+ #if defined(XP_MACOSX)
+   widgetContext.mLayerManager = this;
++#elif defined(MOZ_WIDGET_ANDROID)
++  widgetContext.mCompositor = GetCompositor();
+ #endif
+ 
+   {
+@@ -901,6 +903,14 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
+   CompositorBench(mCompositor, bounds);
+ 
+   MOZ_ASSERT(mRoot->GetOpacity() == 1);
++#if defined(MOZ_WIDGET_ANDROID)
++  LayerMetricsWrapper wrapper = GetRootContentLayer();
++  if (wrapper) {
++    mCompositor->SetClearColor(wrapper.Metadata().GetBackgroundColor());
++  } else {
++    mCompositor->SetClearColorToDefault();
++  }
++#endif
+   if (mRoot->GetClipRect()) {
+     clipRect = *mRoot->GetClipRect();
+     IntRect rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+diff --git a/gfx/layers/composite/TextureHost.cpp b/gfx/layers/composite/TextureHost.cpp
+index 5277e42836..f695c5c14c 100644
+--- a/gfx/layers/composite/TextureHost.cpp
++++ b/gfx/layers/composite/TextureHost.cpp
+@@ -43,6 +43,10 @@
+ #include "../opengl/MacIOSurfaceTextureHostOGL.h"
+ #endif
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#endif
++
+ #ifdef XP_WIN
+ #include "mozilla/layers/TextureDIB.h"
+ #endif
+@@ -968,11 +972,33 @@ BufferTextureHost::Upload(nsIntRegion *aRegion)
+     if (!surf) {
+       return false;
+     }
+-
++#ifdef MOZ_WIDGET_ANDROID
++    {
++      int32_t stride = ImageDataSerializer::ComputeRGBStride(mFormat, mSize.width);
++      uint64_t sum = 0;
++      uint32_t n = 0;
++      for (int y = 0; y < mSize.height; y += (mSize.height > 32 ? mSize.height / 32 : 1)) {
++        for (int x = 0; x < mSize.width; x += (mSize.width > 32 ? mSize.width / 32 : 1)) {
++          const uint8_t* p = GetBuffer() + y * stride + x * 4;
++          sum += p[0] + p[1] + p[2] + p[3];
++          n++;
++        }
++      }
++      bool ok = mFirstSource->Update(surf.get(), regionToUpdate);
++      __android_log_print(ANDROID_LOG_INFO, "PMDL",
++        "BufferUpload %dx%d fmt=%d sum=%llu n=%u update=%d",
++        mSize.width, mSize.height, (int)mFormat,
++        (unsigned long long)sum, n, (int)ok);
++      if (!ok) {
++        return false;
++      }
++    }
++#else
+     if (!mFirstSource->Update(surf.get(), regionToUpdate)) {
+       NS_WARNING("failed to update the DataTextureSource");
+       return false;
+     }
++#endif
+   }
+   MOZ_ASSERT(mFirstSource);
+   return true;
+diff --git a/gfx/layers/composite/TiledContentHost.cpp b/gfx/layers/composite/TiledContentHost.cpp
+index a80c47fb98..3f4bebfadf 100644
+--- a/gfx/layers/composite/TiledContentHost.cpp
++++ b/gfx/layers/composite/TiledContentHost.cpp
+@@ -21,6 +21,13 @@
+ #include "nsRect.h"                     // for IntRect
+ #include "mozilla/layers/TextureClient.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMTH(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMTH(...)
++#endif
++
+ namespace mozilla {
+ using namespace gfx;
+ namespace layers {
+@@ -143,6 +150,9 @@ bool
+ TiledContentHost::UseTiledLayerBuffer(ISurfaceAllocator* aAllocator,
+                                       const SurfaceDescriptorTiles& aTiledDescriptor)
+ {
++  PMTH("UseTiledLayerBuffer host=%p res=%f tiles=%u",
++       (void*)this, (double)aTiledDescriptor.resolution(),
++       (unsigned)aTiledDescriptor.tiles().Length());
+   if (aTiledDescriptor.resolution() < 1) {
+     if (!mLowPrecisionTiledBuffer.UseTiles(aTiledDescriptor, mCompositor, aAllocator)) {
+       return false;
+@@ -298,6 +308,8 @@ TiledLayerBufferComposite::UseTiles(const SurfaceDescriptorTiles& aTiles,
+     const TexturedTileDescriptor& texturedDesc = tileDesc.get_TexturedTileDescriptor();
+ 
+     tile.mTextureHost = TextureHost::AsTextureHost(texturedDesc.textureParent());
++    PMTH("UseTiles tile %u host=%p type=%d",
++         (unsigned)i, (void*)tile.mTextureHost.get(), (int)tileDesc.type());
+     tile.mTextureHost->SetCompositor(aCompositor);
+     tile.mTextureHost->DeserializeReadLock(texturedDesc.sharedLock(), aAllocator);
+ 
+@@ -461,11 +473,13 @@ TiledContentHost::RenderTile(TileHost& aTile,
+   AutoLockTextureHost autoLockOnWhite(aTile.mTextureHostOnWhite);
+   if (autoLock.Failed() ||
+       autoLockOnWhite.Failed()) {
++    PMTH("RenderTile LOCK FAILED host=%p", (void*)aTile.mTextureHost.get());
+     NS_WARNING("Failed to lock tile");
+     return;
+   }
+ 
+   if (!aTile.mTextureHost->BindTextureSource(aTile.mTextureSource)) {
++    PMTH("RenderTile BIND FAILED host=%p", (void*)aTile.mTextureHost.get());
+     return;
+   }
+ 
+@@ -480,8 +494,13 @@ TiledContentHost::RenderTile(TileHost& aTile,
+                          true,
+                          aTile.mTextureHost->GetRenderState());
+   if (!effect) {
++    PMTH("RenderTile NO EFFECT host=%p src=%p",
++         (void*)aTile.mTextureHost.get(), (void*)aTile.mTextureSource.get());
+     return;
+   }
++  PMTH("RenderTile draw src=%p bounds=%dx%d",
++       (void*)aTile.mTextureSource.get(),
++       aTextureBounds.width, aTextureBounds.height);
+ 
+   float opacity = aTile.GetFadeInOpacity(aOpacity);
+   aEffectChain.mPrimaryEffect = effect;
+@@ -559,6 +578,13 @@ TiledContentHost::RenderLayerBuffer(TiledLayerBufferComposite& aLayerBuffer,
+   IntRect visibleRect = aVisibleRegion.GetBounds();
+ 
+   if (compositeRegion.IsEmpty()) {
++    PMTH("RenderLayerBuffer EMPTY compRegion tiles=%u valid=%d,%d,%d,%d vis=%d,%d,%d,%d",
++         (unsigned)aLayerBuffer.GetTileCount(),
++         aLayerBuffer.GetValidRegion().GetBounds().x,
++         aLayerBuffer.GetValidRegion().GetBounds().y,
++         aLayerBuffer.GetValidRegion().GetBounds().width,
++         aLayerBuffer.GetValidRegion().GetBounds().height,
++         visibleRect.x, visibleRect.y, visibleRect.width, visibleRect.height);
+     return;
+   }
+ 
+diff --git a/gfx/layers/opengl/CompositorOGL.cpp b/gfx/layers/opengl/CompositorOGL.cpp
+index 616a03ab77..2fc21291ee 100644
+--- a/gfx/layers/opengl/CompositorOGL.cpp
++++ b/gfx/layers/opengl/CompositorOGL.cpp
+@@ -45,6 +45,10 @@
+ 
+ #include "GeckoProfiler.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#endif
++
+ namespace mozilla {
+ 
+ using namespace std;
+@@ -975,6 +979,16 @@ CompositorOGL::DrawQuad(const Rect& aRect,
+   PROFILER_LABEL("CompositorOGL", "DrawQuad",
+     js::ProfileEntry::Category::GRAPHICS);
+ 
++#ifdef MOZ_WIDGET_ANDROID
++  __android_log_print(ANDROID_LOG_INFO, "PMDL",
++    "DrawQuad rect=%.0f,%.0f,%.0f,%.0f clip=%d,%d,%d,%d op=%.2f tr=%.2f %.2f %.2f %.2f %.2f %.2f",
++    aRect.x, aRect.y, aRect.width, aRect.height,
++    aClipRect.x, aClipRect.y, aClipRect.width, aClipRect.height,
++    aOpacity,
++    aTransform._11, aTransform._12, aTransform._21, aTransform._22,
++    aTransform._41, aTransform._42);
++#endif
++
+   DrawGeometry(aRect, aClipRect, aEffectChain,
+                aOpacity, aTransform, aVisibleRect);
+ }
+@@ -1610,6 +1624,23 @@ CompositorOGL::EndFrame()
+     mTexturePool->EndFrame();
+   }
+ 
++#ifdef MOZ_WIDGET_ANDROID
++  {
++    // Read back a few pixels from the presented framebuffer, right before swap.
++    uint8_t px[4] = {0};
++    uint8_t px2[4] = {0};
++    gfx::IntSize size = mWidget->GetClientSize().ToUnknownSize();
++    mGLContext->fReadPixels(size.width / 2, size.height / 2, 1, 1,
++                            LOCAL_GL_RGBA, LOCAL_GL_UNSIGNED_BYTE, px);
++    mGLContext->fReadPixels(size.width / 4, size.height / 4, 1, 1,
++                            LOCAL_GL_RGBA, LOCAL_GL_UNSIGNED_BYTE, px2);
++    __android_log_print(ANDROID_LOG_INFO, "PMDL",
++      "EndFrame readback %dx%d center=%02x%02x%02x%02x q=%02x%02x%02x%02x err=0x%x",
++      size.width, size.height, px[0], px[1], px[2], px[3],
++      px2[0], px2[1], px2[2], px2[3], mGLContext->fGetError());
++  }
++#endif
++
+   mGLContext->SwapBuffers();
+   mGLContext->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, 0);
+ 
+@@ -1700,7 +1731,7 @@ CompositorOGL::Pause()
+ bool
+ CompositorOGL::Resume()
+ {
+-#if defined(MOZ_WIDGET_UIKIT)
++#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
+   if (!gl() || gl()->IsDestroyed())
+     return false;
+ 
 diff --git a/gfx/skia/moz.build b/gfx/skia/moz.build
 index a41723b382..8020a60d12 100644
 --- a/gfx/skia/moz.build
@@ -412,6 +1081,20 @@ index a41723b382..8020a60d12 100644
      CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
      CXXFLAGS += CONFIG['CAIRO_FT_CFLAGS']
  
+diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
+index d5eb69b410..e1bed51cf4 100644
+--- a/gfx/thebes/gfxPlatform.cpp
++++ b/gfx/thebes/gfxPlatform.cpp
+@@ -2124,6 +2124,9 @@ gfxPlatform::AccelerateLayersByDefault()
+   // Note: add any new platform defines here that should get HWA by default.
+ #if defined(XP_WIN) || defined(XP_MACOSX) || defined(MOZ_WIDGET_GTK)
+   return true;
++#elif defined(MOZ_WIDGET_ANDROID)
++  // Android requires GL compositing to present to the LayerView surface.
++  return true;
+ #elif defined(MOZ_GL_PROVIDER)
+   // GL provider manually declared
+   return true;
 diff --git a/gfx/thebes/gfxPlatform.h b/gfx/thebes/gfxPlatform.h
 index 67d8f28fd5..f867185c84 100644
 --- a/gfx/thebes/gfxPlatform.h
@@ -653,6 +1336,202 @@ index 86dadc37bb..7735904bc8 100644
  
          if (!ok) {
              if (aPropagateExceptions && aes.HasException()) {
+diff --git a/layout/base/FrameLayerBuilder.cpp b/layout/base/FrameLayerBuilder.cpp
+index d23ca436c9..3dd37f4d09 100644
+--- a/layout/base/FrameLayerBuilder.cpp
++++ b/layout/base/FrameLayerBuilder.cpp
+@@ -54,6 +54,13 @@
+ 
+ #include <algorithm>
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMFB(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMFB(...)
++#endif
++
+ using namespace mozilla::layers;
+ using namespace mozilla::gfx;
+ 
+@@ -6031,8 +6038,15 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
+   PaintedLayerItemsEntry* entry = layerBuilder->mPaintedLayerItems.GetEntry(aLayer);
+   NS_ASSERTION(entry, "We shouldn't be drawing into a layer with no items!");
+   if (!entry->mContainerLayerFrame) {
++    PMFB("DrawPaintedLayer NO CONTAINER FRAME layer=%p", (void*)aLayer);
+     return;
+   }
++  PMFB("DrawPaintedLayer layer=%p items=%u draw=%d,%d,%d,%d dirty=%d,%d,%d,%d",
++       (void*)aLayer, (unsigned)entry->mItems.Length(),
++       aRegionToDraw.GetBounds().x, aRegionToDraw.GetBounds().y,
++       aRegionToDraw.GetBounds().width, aRegionToDraw.GetBounds().height,
++       aDirtyRegion.GetBounds().x, aDirtyRegion.GetBounds().y,
++       aDirtyRegion.GetBounds().width, aDirtyRegion.GetBounds().height);
+ 
+ 
+   PaintedDisplayItemLayerUserData* userData =
+diff --git a/layout/base/nsDisplayList.cpp b/layout/base/nsDisplayList.cpp
+index 766a3fa3e1..d81507b068 100644
+--- a/layout/base/nsDisplayList.cpp
++++ b/layout/base/nsDisplayList.cpp
+@@ -11,6 +11,13 @@
+ 
+ #include "nsDisplayList.h"
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMDL(...) __android_log_print(ANDROID_LOG_INFO, "PMDL", __VA_ARGS__)
++#else
++#define PMDL(...)
++#endif
++
+ #include <stdint.h>
+ #include <algorithm>
+ #include <limits>
+@@ -1786,6 +1793,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
+   bool widgetTransaction = false;
+   bool doBeginTransaction = true;
+   nsView *view = nullptr;
++  PMDL("PaintRoot enter flags=%d ctx=%p", (int)aFlags, (void*)aCtx);
+   if (aFlags & PAINT_USE_WIDGET_LAYERS) {
+     layerManager = aBuilder->GetWidgetLayerManager(&view);
+     if (layerManager) {
+@@ -1795,6 +1803,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
+   }
+   if (!layerManager) {
+     if (!aCtx) {
++      PMDL("PaintRoot no layerManager no ctx");
+       NS_WARNING("Nowhere to paint into");
+       return nullptr;
+     }
+@@ -1867,9 +1876,19 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
+   nsIDocument* document = presShell->GetDocument();
+ 
+   if (!root) {
++    PMDL("PaintRoot NO ROOT frame=%p items=%d",
++         (void*)frame, (int)Count());
+     layerManager->SetUserData(&gLayerManagerLayerBuilder, oldBuilder);
+     return nullptr;
+   }
++  {
++    int kids = 0;
++    for (Layer* l = root->GetFirstChild(); l; l = l->GetNextSibling()) kids++;
++    PMDL("PaintRoot frame=%p items=%d kids=%d vr_empty=%d suppressed=%d",
++         (void*)frame, (int)Count(), kids,
++         (int)root->GetVisibleRegion().IsEmpty(),
++         presShell ? (int)presShell->IsPaintingSuppressed() : -1);
++  }
+   // Root is being scaled up by the X/Y resolution. Scale it back down.
+   root->SetPostScale(1.0f/containerParameters.mXScale,
+                      1.0f/containerParameters.mYScale);
+diff --git a/layout/base/nsDocumentViewer.cpp b/layout/base/nsDocumentViewer.cpp
+index 95e1ad0010..9f572b10bb 100644
+--- a/layout/base/nsDocumentViewer.cpp
++++ b/layout/base/nsDocumentViewer.cpp
+@@ -4295,7 +4295,7 @@ nsDocumentViewer::ShouldAttachToTopLevel()
+   if (nsIWidget::UsePuppetWidgets())
+     return true;
+ 
+-#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
++#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
+   // On windows, in the parent process we also attach, but just to
+   // chrome items
+   nsWindowType winType = mParentWidget->WindowType();
+diff --git a/layout/base/nsPresShell.cpp b/layout/base/nsPresShell.cpp
+index 0a50d69743..97b9ce3d25 100644
+--- a/layout/base/nsPresShell.cpp
++++ b/layout/base/nsPresShell.cpp
+@@ -42,6 +42,14 @@
+ 
+ #include "gfxPrefs.h"
+ #include "gfxUserFontSet.h"
++
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMPS(...) __android_log_print(ANDROID_LOG_INFO, "PMPS", __VA_ARGS__)
++#else
++#define PMPS(...)
++#endif
++
+ #include "nsPresShell.h"
+ #include "nsPresContext.h"
+ #include "nsIContent.h"
+@@ -6151,6 +6159,7 @@ PresShell::Paint(nsView*        aViewToPaint,
+   MOZ_ASSERT(!mApproximateFrameVisibilityVisited, "Should have been cleared");
+ 
+   if (!mIsActive) {
++    PMPS("Paint INACTIVE shell=%p", (void*)this);
+     return;
+   }
+ 
+@@ -6158,6 +6167,9 @@ PresShell::Paint(nsView*        aViewToPaint,
+   AUTO_LAYOUT_PHASE_ENTRY_POINT(presContext, Paint);
+ 
+   nsIFrame* frame = aViewToPaint->GetFrame();
++  PMPS("Paint shell=%p view=%p frame=%p flags=%u suppressed=%d first=%d",
++       (void*)this, (void*)aViewToPaint, (void*)frame, (unsigned)aFlags,
++       (int)mPaintingSuppressed, (int)mIsFirstPaint);
+ 
+   LayerManager* layerManager =
+     aViewToPaint->GetWidget()->GetLayerManager();
+@@ -6189,7 +6201,9 @@ PresShell::Paint(nsView*        aViewToPaint,
+     // that will cause us to forget to update the real layer manager!
+ 
+     if (!(aFlags & PAINT_LAYERS)) {
+-      if (layerManager->EndEmptyTransaction()) {
++      bool emptyOk = layerManager->EndEmptyTransaction();
++      PMPS("Paint no-LAYERS empty=%d shell=%p", (int)emptyOk, (void*)this);
++      if (emptyOk) {
+         return;
+       }
+       NS_WARNING("Must complete empty transaction when compositing!");
+@@ -6260,11 +6274,14 @@ PresShell::Paint(nsView*        aViewToPaint,
+ 
+   if (frame) {
+     // We can paint directly into the widget using its layer manager.
++    PMPS("Paint PaintFrame shell=%p frame=%p flags=%u",
++         (void*)this, (void*)frame, (unsigned)flags);
+     nsLayoutUtils::PaintFrame(nullptr, frame, aDirtyRegion, bgcolor,
+                               nsDisplayListBuilderMode::PAINTING, flags);
+     return;
+   }
+ 
++  PMPS("Paint NO FRAME color-layer shell=%p", (void*)this);
+   RefPtr<ColorLayer> root = layerManager->CreateColorLayer();
+   if (root) {
+     nsPresContext* pc = GetPresContext();
+diff --git a/layout/base/nsRefreshDriver.cpp b/layout/base/nsRefreshDriver.cpp
+index e4cc981149..1b3eead0eb 100644
+--- a/layout/base/nsRefreshDriver.cpp
++++ b/layout/base/nsRefreshDriver.cpp
+@@ -27,6 +27,12 @@
+ #include "mozilla/ArrayUtils.h"
+ #include "mozilla/AutoRestore.h"
+ #include "mozilla/IntegerRange.h"
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMRD(...) __android_log_print(ANDROID_LOG_INFO, "GeckoRD", __VA_ARGS__)
++#else
++#define PMRD(...) do {} while (0)
++#endif
+ #include "nsHostObjectProtocolHandler.h"
+ #include "nsRefreshDriver.h"
+ #include "nsITimer.h"
+@@ -1854,6 +1860,14 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
+   mPresShellsToInvalidateIfHidden.Clear();
+ 
+   bool notifyGC = false;
++#ifdef MOZ_WIDGET_ANDROID
++  {
++    static int sRdTick = 0;
++    if (++sRdTick <= 5 || sRdTick % 60 == 0) {
++      PMRD("Tick #%d vmFlushPending=%d", sRdTick, (int)mViewManagerFlushIsPending);
++    }
++  }
++#endif
+   if (mViewManagerFlushIsPending) {
+     RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
+ 
 diff --git a/media/libstagefright/system/core/liblog/logd_write.c b/media/libstagefright/system/core/liblog/logd_write.c
 index 7bdf61e876..6879756596 100644
 --- a/media/libstagefright/system/core/liblog/logd_write.c
@@ -836,7 +1715,7 @@ index a410474b6f..2d7599f8ef 100644
      fputs("\n", stderr);
      MOZ_CRASH();
 diff --git a/memory/mozjemalloc/jemalloc.c b/memory/mozjemalloc/jemalloc.c
-index a7aecc54a1..987faf935a 100644
+index a7aecc54a1..57dcc29550 100644
 --- a/memory/mozjemalloc/jemalloc.c
 +++ b/memory/mozjemalloc/jemalloc.c
 @@ -168,7 +168,7 @@
@@ -848,7 +1727,60 @@ index a7aecc54a1..987faf935a 100644
  #define	_GNU_SOURCE /* For mremap(2). */
  #endif
  
-@@ -494,7 +494,7 @@ static volatile bool malloc_initialized = false;
+@@ -269,6 +269,52 @@ typedef long ssize_t;
+ #  define __DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
+ #endif
+ #include <sys/mman.h>
++#ifdef MOZ_MEMORY_ANDROID
++#include <android/log.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <stdio.h>
++#include <string.h>
++
++static void
++pmjem_log_map_region(const char* what, unsigned long addr)
++{
++	static char maps[262144];
++	int fd = open("/proc/self/maps", O_RDONLY);
++	ssize_t total = 0;
++	if (fd < 0)
++		return;
++	for (;;) {
++		ssize_t n = read(fd, maps + total, sizeof(maps) - 1 - total);
++		if (n <= 0)
++			break;
++		total += n;
++		if (total >= (ssize_t)sizeof(maps) - 1)
++			break;
++	}
++	close(fd);
++	if (total <= 0)
++		return;
++	maps[total] = 0;
++	{
++		char* p = maps;
++		while (*p) {
++			char* nl = strchr(p, '\n');
++			unsigned long lo, hi;
++			if (nl)
++				*nl = 0;
++			if (sscanf(p, "%lx-%lx", &lo, &hi) == 2 &&
++			    addr >= lo && addr < hi) {
++				__android_log_print(6, "PMJEM",
++				  "%s %lx in %s", what, addr, p);
++			}
++			if (!nl)
++				break;
++			p = nl + 1;
++		}
++	}
++}
++#endif
+ #ifndef MADV_FREE
+ #  define MADV_FREE	MADV_DONTNEED
+ #endif
+@@ -494,7 +540,7 @@ static volatile bool malloc_initialized = false;
  /* No init lock for Windows nor FreeBSD. */
  #elif defined(MOZ_MEMORY_DARWIN)
  static malloc_mutex_t init_lock = {OS_SPINLOCK_INIT};
@@ -857,7 +1789,7 @@ index a7aecc54a1..987faf935a 100644
  static malloc_mutex_t init_lock = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP;
  #else
  static malloc_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
-@@ -1400,7 +1400,7 @@ malloc_mutex_init(malloc_mutex_t *mutex)
+@@ -1400,7 +1446,7 @@ malloc_mutex_init(malloc_mutex_t *mutex)
      InitializeSRWLock(mutex);
  #elif defined(MOZ_MEMORY_DARWIN)
  	mutex->lock = OS_SPINLOCK_INIT;
@@ -866,7 +1798,7 @@ index a7aecc54a1..987faf935a 100644
  	pthread_mutexattr_t attr;
  	if (pthread_mutexattr_init(&attr) != 0)
  		return (true);
-@@ -1466,7 +1466,7 @@ malloc_spin_init(malloc_spinlock_t *lock)
+@@ -1466,7 +1512,7 @@ malloc_spin_init(malloc_spinlock_t *lock)
  	InitializeSRWLock(lock);
  #elif defined(MOZ_MEMORY_DARWIN)
  	lock->lock = OS_SPINLOCK_INIT;
@@ -875,6 +1807,39 @@ index a7aecc54a1..987faf935a 100644
  	pthread_mutexattr_t attr;
  	if (pthread_mutexattr_init(&attr) != 0)
  		return (true);
+@@ -4211,8 +4257,32 @@ arena_dalloc(void *ptr, size_t offset)
+ 	assert(offset != 0);
+ 	assert(CHUNK_ADDR2OFFSET(ptr) == offset);
+ 
++#ifdef MOZ_MEMORY_ANDROID
++	if ((uintptr_t)ptr < (uintptr_t)chunksize ||
++	    (uintptr_t)(ptr) - offset < (uintptr_t)chunksize) {
++		__android_log_print(6, "PMJEM",
++		  "arena_dalloc tiny ptr=%p offset=%zx", ptr, offset);
++	}
++#endif
+ 	chunk = (arena_chunk_t *) ((uintptr_t)ptr - offset);
+ 	arena = chunk->arena;
++#ifdef MOZ_MEMORY_ANDROID
++	{
++		int known = 0;
++		unsigned j;
++		for (j = 0; j < narenas; j++) {
++			if (arenas[j] == arena) { known = 1; break; }
++		}
++		if (!known) {
++			__android_log_print(6, "PMJEM",
++			  "arena_dalloc foreign arena ptr=%p offset=%zx chunk=%p arena=%p ra=%p",
++			  ptr, offset, (void*)chunk, (void*)arena,
++			  __builtin_return_address(0));
++			pmjem_log_map_region("ptr region", (unsigned long)ptr);
++			pmjem_log_map_region("chunk region", (unsigned long)chunk);
++		}
++	}
++#endif
+ 	assert(arena != NULL);
+ 	RELEASE_ASSERT(arena->magic == ARENA_MAGIC);
+ 
 diff --git a/mfbt/Assertions.cpp b/mfbt/Assertions.cpp
 index 62630842d6..49f4b6b916 100644
 --- a/mfbt/Assertions.cpp
@@ -905,6 +1870,33 @@ index 62630842d6..49f4b6b916 100644
    MOZ_RELEASE_ASSERT(ret >= 0 && size_t(ret) < sPrintfCrashReasonSize,
      "Could not write the explanation string to the supplied buffer!");
  #ifdef DEBUG
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index 2240eb3d3b..4acde663c8 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -4378,7 +4378,7 @@ pref("network.tcp.keepalive.probe_count", 4);
+ #endif
+ 
+ // Whether to disable acceleration for all widgets.
+-#if defined(XP_UNIX) && !defined(XP_MACOSX)
++#if defined(XP_UNIX) && !defined(XP_MACOSX) && !defined(MOZ_WIDGET_ANDROID)
+ // On Linux this is disabled by default for known issues with "free" drivers
+ pref("layers.acceleration.enabled", false);
+ #else
+@@ -4386,7 +4386,13 @@ pref("layers.acceleration.enabled", true);
+ #endif
+ // Whether to force acceleration on, ignoring blacklists.
+ // This requires layers.acceleration.enabled to be set to true
++#ifdef MOZ_WIDGET_ANDROID
++// bug 838603 -- on Android, accidentally blacklisting OpenGL layers
++// means a startup crash for everyone.
++pref("layers.acceleration.force", true);
++#else
+ pref("layers.acceleration.force", false);
++#endif
+ 
+ // Preferred X11 GL context provider. "auto" prefers EGL and falls back to GLX,
+ // "egl" forces EGL, and "glx" forces the legacy GLX path. Restart required.
 diff --git a/mozglue/build/moz.build b/mozglue/build/moz.build
 index c6b6518119..7a3f9eb907 100644
 --- a/mozglue/build/moz.build
@@ -1167,6 +2159,19 @@ index 3f4591218f..7f4a370403 100644
  #elif defined(XP_LINUX)
      { NS_NETWORK_LINK_SERVICE_CONTRACTID, &kNS_NETWORK_LINK_SERVICE_CID },
  #endif
+diff --git a/netwerk/protocol/data/nsDataHandler.cpp b/netwerk/protocol/data/nsDataHandler.cpp
+index b84b50d5bd..864a8bc80f 100644
+--- a/netwerk/protocol/data/nsDataHandler.cpp
++++ b/netwerk/protocol/data/nsDataHandler.cpp
+@@ -232,7 +232,7 @@ nsDataHandler::ParseURI(nsCString& spec,
+             }
+         }
+ 
+-        free(buffer);
++        PL_strfree(buffer);
+     }
+ 
+     if (dataBuffer) {
 diff --git a/netwerk/system/moz.build b/netwerk/system/moz.build
 index dcf7d6c3f1..4b0babba2e 100644
 --- a/netwerk/system/moz.build
@@ -1427,6 +2432,51 @@ index d78cdd23a8..1dbf4a7e57 100644
    nsresult rv;
  
    rv = EnumerateValidators(EnumValidate, nullptr);
+diff --git a/toolkit/components/jsdownloads/src/DownloadIntegration.jsm b/toolkit/components/jsdownloads/src/DownloadIntegration.jsm
+index 22a6570dac..8ef6a2954c 100644
+--- a/toolkit/components/jsdownloads/src/DownloadIntegration.jsm
++++ b/toolkit/components/jsdownloads/src/DownloadIntegration.jsm
+@@ -204,19 +204,25 @@ this.DownloadIntegration = {
+       throw new Error("Initialization may be performed only once.");
+     }
+ 
++    Cu.reportError("PMJCL DLStore: enter");
+     this._store = new DownloadStore(list, OS.Path.join(
+                                              OS.Constants.Path.profileDir,
+                                              "downloads.json"));
+     this._store.onsaveitem = this.shouldPersistDownload.bind(this);
++    Cu.reportError("PMJCL DLStore: store made imported=" + this._importedFromSqlite);
+ 
+     try {
+       if (this._importedFromSqlite) {
++        Cu.reportError("PMJCL DLStore: before store.load");
+         yield this._store.load();
++        Cu.reportError("PMJCL DLStore: after store.load");
+       } else {
+         let sqliteDBpath = OS.Path.join(OS.Constants.Path.profileDir,
+                                         "downloads.sqlite");
+ 
++        Cu.reportError("PMJCL DLStore: before exists " + sqliteDBpath);
+         if (yield OS.File.exists(sqliteDBpath)) {
++          Cu.reportError("PMJCL DLStore: exists true, importing");
+           let sqliteImport = new DownloadImport(list, sqliteDBpath);
+           yield sqliteImport.import();
+ 
+@@ -243,12 +249,14 @@ this.DownloadIntegration = {
+       Cu.reportError(ex);
+     }
+ 
++    Cu.reportError("PMJCL DLStore: before autosave view");
+     // Add the view used for detecting changes to downloads to be persisted.
+     // We must do this after the list of persistent downloads has been loaded,
+     // even if the load operation failed. We wait for a complete initialization
+     // so other callers cannot modify the list without being detected. The
+     // DownloadAutoSaveView is kept alive by the underlying DownloadList.
+     yield new DownloadAutoSaveView(list, this._store).initialize();
++    Cu.reportError("PMJCL DLStore: done");
+   }),
+ 
+   /**
 diff --git a/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp b/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp
 index 5d97b6f1b8..b805d2b480 100644
 --- a/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp
@@ -1444,6 +2494,224 @@ index 5d97b6f1b8..b805d2b480 100644
    return NS_ERROR_NOT_AVAILABLE;
 +#endif
  }
+diff --git a/toolkit/components/search/nsSearchService.js b/toolkit/components/search/nsSearchService.js
+index 7b45e30644..77e29c3206 100644
+--- a/toolkit/components/search/nsSearchService.js
++++ b/toolkit/components/search/nsSearchService.js
+@@ -478,7 +478,10 @@ function makeURI(aURLSpec, aCharset) {
+  */
+ function makeChannel(url) {
+   try {
+-    return NetUtil.newChannel({uri: url, loadUsingSystemPrincipal: true});
++    Cu.reportError("PMJCL SS-JAR: makeChannel " + url);
++    let ch = NetUtil.newChannel({uri: url, loadUsingSystemPrincipal: true});
++    Cu.reportError("PMJCL SS-JAR: makeChannel done");
++    return ch;
+   } catch (ex) { }
+ 
+   return null;
+@@ -1112,19 +1115,26 @@ Engine.prototype = {
+    */
+   _retrieveSearchXMLData: function SRCH_ENG__retrieveSearchXMLData(aURL) {
+     let deferred = Promise.defer();
++    Cu.reportError("PMJCL ENGXML: enter " + aURL);
+     let request = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"].
+                     createInstance(Ci.nsIXMLHttpRequest);
+     request.overrideMimeType("text/xml");
+     request.onload = (aEvent) => {
++      Cu.reportError("PMJCL ENGXML: onload " + aURL);
+       let responseXML = aEvent.target.responseXML;
++      Cu.reportError("PMJCL ENGXML: got responseXML " + !!responseXML);
+       this._data = responseXML.documentElement;
++      Cu.reportError("PMJCL ENGXML: got docElement");
+       deferred.resolve();
+     };
+     request.onerror = function(aEvent) {
++      Cu.reportError("PMJCL ENGXML: onerror " + aURL);
+       deferred.resolve();
+     };
+     request.open("GET", aURL, true);
++    Cu.reportError("PMJCL ENGXML: opened " + aURL);
+     request.send();
++    Cu.reportError("PMJCL ENGXML: sent " + aURL);
+ 
+     return deferred.promise;
+   },
+@@ -1427,14 +1437,15 @@ Engine.prototype = {
+     if (!uri)
+       return;
+ 
+-    LOG("_setIcon: Setting icon url \"" + limitURILength(uri.spec) + "\" for engine \""
+-        + this.name + "\".");
++    Cu.reportError("PMJCL ENG: setIcon scheme=" + uri.scheme);
+     // Only accept remote icons from http[s] or ftp
+     switch (uri.scheme) {
+       case "data":
+         if (!this._hasPreferredIcon || aIsPreferred) {
+           this._iconURI = uri;
++          Cu.reportError("PMJCL ENG: before notifyAction");
+           notifyAction(this, SEARCH_ENGINE_CHANGED);
++          Cu.reportError("PMJCL ENG: after notifyAction");
+           this._hasPreferredIcon = aIsPreferred;
+         }
+ 
+@@ -1505,15 +1516,19 @@ Engine.prototype = {
+     ENSURE_WARN(this._data, "Can't init an engine with no data!",
+                 Cr.NS_ERROR_UNEXPECTED);
+ 
++    Cu.reportError("PMJCL ENG: initFromData enter");
+     // Ensure we have a supported engine type before attempting to parse it.
+     let element = this._data;
++    Cu.reportError("PMJCL ENG: localName=" + element.localName + " ns=" + element.namespaceURI);
+     if ((element.localName == MOZSEARCH_LOCALNAME &&
+          element.namespaceURI == MOZSEARCH_NS_10) ||
+         (element.localName == OPENSEARCH_LOCALNAME &&
+          OPENSEARCH_NAMESPACES.indexOf(element.namespaceURI) != -1)) {
+       LOG("_init: Initing search plugin from " + this._location);
+ 
++      Cu.reportError("PMJCL ENG: before parse");
+       this._parse();
++      Cu.reportError("PMJCL ENG: after parse");
+ 
+     } else
+       FAIL(this._location + " is not a valid search plugin.", Cr.NS_ERROR_FAILURE);
+@@ -1629,17 +1644,21 @@ Engine.prototype = {
+    */
+   _parseImage: function SRCH_ENG_parseImage(aElement) {
+     LOG("_parseImage: Image textContent: \"" + limitURILength(aElement.textContent) + "\"");
++    Cu.reportError("PMJCL ENG: parseImage enter");
+ 
+     let width = parseInt(aElement.getAttribute("width"), 10);
+     let height = parseInt(aElement.getAttribute("height"), 10);
+     let isPrefered = width == 16 && height == 16;
++    Cu.reportError("PMJCL ENG: parseImage attrs w=" + width + " h=" + height);
+ 
+     if (isNaN(width) || isNaN(height) || width <= 0 || height <=0) {
+       LOG("OpenSearch image element must have positive width and height.");
+       return;
+     }
+ 
++    Cu.reportError("PMJCL ENG: before setIcon");
+     this._setIcon(aElement.textContent, isPrefered, width, height);
++    Cu.reportError("PMJCL ENG: after setIcon");
+   },
+ 
+   /**
+@@ -1654,6 +1673,7 @@ Engine.prototype = {
+ 
+     for (var i = 0; i < doc.childNodes.length; ++i) {
+       var child = doc.childNodes[i];
++      Cu.reportError("PMJCL ENG: parse child " + i + " " + child.localName);
+       switch (child.localName) {
+         case "ShortName":
+           this._name = child.textContent;
+@@ -2758,15 +2778,17 @@ SearchService.prototype = {
+    */
+   _asyncLoadEngines: function SRCH_SVC__asyncLoadEngines() {
+     return Task.spawn(function() {
+-      LOG("_asyncLoadEngines: start");
++      Cu.reportError("PMJCL SS: loadEngines enter");
+       // See if we have a cache file so we don't have to parse a bunch of XML.
+       let cache = {};
+       let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
+       cache = yield checkForSyncCompletion(this._asyncReadCacheFile(cacheFilePath));
++      Cu.reportError("PMJCL SS: cache read");
+ 
+       Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "find-jar-engines");
+       let [chromeFiles, chromeURIs] =
+         yield checkForSyncCompletion(this._asyncFindJAREngines());
++      Cu.reportError("PMJCL SS: jar engines found");
+ 
+       // Get the non-empty distribution directories into distDirs...
+       let distDirs = [];
+@@ -2794,6 +2816,7 @@ SearchService.prototype = {
+         }
+       }
+ 
++      Cu.reportError("PMJCL SS: distDirs=" + distDirs.length);
+       // Add the non-empty directories of NS_APP_SEARCH_DIR_LIST to
+       // otherDirs...
+       let otherDirs = [];
+@@ -2842,8 +2865,8 @@ SearchService.prototype = {
+         return cache.visibleDefaultEngines.indexOf(aEngineName) == -1;
+       }
+ 
++      Cu.reportError("PMJCL SS: otherDirs=" + otherDirs.length);
+       let buildID = Services.appinfo.platformBuildID;
+-      // Gecko44: let cachePaths = [path for (path in cache.directories)];
+       let cachePaths = [];
+       for (path in cache.directories) {
+         cachePaths.push(path);
+@@ -2859,6 +2882,7 @@ SearchService.prototype = {
+                          this._visibleDefaultEngines.some(notInCacheVisibleEngines) ||
+                          (yield checkForSyncCompletion(hasModifiedDir(toLoad)));
+ 
++      Cu.reportError("PMJCL SS: rebuildCache=" + rebuildCache);
+       if (rebuildCache) {
+         LOG("_asyncLoadEngines: Absent or outdated cache. Loading engines from disk.");
+         let engines = [];
+@@ -2954,7 +2978,9 @@ SearchService.prototype = {
+     return Task.spawn(function() {
+       let json;
+       try {
++        Cu.reportError("PMJCL SS: before OS.File.read");
+         let bytes = yield OS.File.read(aPath);
++        Cu.reportError("PMJCL SS: after OS.File.read");
+         json = JSON.parse(new TextDecoder().decode(bytes));
+       } catch (ex) {
+         LOG("_asyncReadCacheFile: Error reading cache file: " + ex);
+@@ -3170,10 +3196,12 @@ SearchService.prototype = {
+       let engines = [];
+       for (let url of aURLs) {
+         try {
+-          LOG("_asyncLoadFromChromeURLs: loading engine from chrome url: " + url);
++          Cu.reportError("PMJCL ENG: load " + url);
+           let engine = new Engine(NetUtil.newURI(url), true);
++          Cu.reportError("PMJCL ENG: ctor done " + url);
+           yield checkForSyncCompletion(engine._asyncInitFromURI());
+           engines.push(engine);
++          Cu.reportError("PMJCL ENG: done " + url);
+         } catch (ex if ex.result != Cr.NS_ERROR_ALREADY_INITIALIZED) {
+           LOG("_asyncLoadFromChromeURLs: failed to load engine: " + ex);
+         }
+@@ -3227,10 +3255,11 @@ SearchService.prototype = {
+    */
+   _asyncFindJAREngines: function SRCH_SVC__asyncFindJAREngines() {
+     return Task.spawn(function() {
+-      LOG("_asyncFindJAREngines: looking for engines in JARs")
++      Cu.reportError("PMJCL SS-JAR: enter " + APP_SEARCH_PREFIX);
+ 
+       let listURL = APP_SEARCH_PREFIX + "list.txt";
+       let chan = makeChannel(listURL);
++      Cu.reportError("PMJCL SS-JAR: chan=" + !!chan);
+       if (!chan) {
+         LOG("_asyncFindJAREngines: " + APP_SEARCH_PREFIX + " isn't registered");
+         throw new Task.Result([[], []]);
+@@ -3246,6 +3275,7 @@ SearchService.prototype = {
+         chromeFiles.push(this._convertChannelToFile(chan));
+         jarPackaging = true;
+       }
++      Cu.reportError("PMJCL SS-JAR: jarPackaging=" + jarPackaging);
+ 
+       // Read list.txt to find the engines we need to load.
+       let deferred = Promise.defer();
+@@ -3259,9 +3289,15 @@ SearchService.prototype = {
+         LOG("_asyncFindJAREngines: failed to read " + listURL);
+         deferred.resolve("");
+       };
+-      request.open("GET", NetUtil.newURI(listURL).spec, true);
++      Cu.reportError("PMJCL SS-JAR: before newURI");
++      let uriSpec = NetUtil.newURI(listURL).spec;
++      Cu.reportError("PMJCL SS-JAR: before XHR open " + uriSpec);
++      request.open("GET", uriSpec, true);
++      Cu.reportError("PMJCL SS-JAR: before send");
+       request.send();
++      Cu.reportError("PMJCL SS-JAR: sent");
+       let list = yield deferred.promise;
++      Cu.reportError("PMJCL SS-JAR: got list len=" + (list && list.length));
+ 
+       this._parseListTxt(list, jarPackaging, chromeFiles, uris);
+       throw new Task.Result([chromeFiles, uris]);
 diff --git a/toolkit/library/moz.build b/toolkit/library/moz.build
 index e32a1258bb..fc48e98190 100644
 --- a/toolkit/library/moz.build
@@ -1581,18 +2849,95 @@ index b188eaea5b..9c2d86400b 100644
      UNIFIED_SOURCES += [
          'EventTracer.cpp',
 diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
-index 0ed2c3e6c8..fc5c51f9bb 100644
+index 0ed2c3e6c8..d07f5c7ce8 100644
 --- a/toolkit/xre/nsAppRunner.cpp
 +++ b/toolkit/xre/nsAppRunner.cpp
-@@ -3520,9 +3520,17 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
+@@ -3520,9 +3520,94 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   * XRE_mainRun - Command line startup, profile migration, and
   * the calling of appStartup->Run().
   */
 +#ifdef ANDROID
 +#include <android/log.h>
++#include <signal.h>
++#include <ucontext.h>
++#include <unistd.h>
++#include <fcntl.h>
 +#define PM_XRELOG(...) __android_log_print(ANDROID_LOG_INFO, "PMXRE", __VA_ARGS__)
++
++// PMDIAG: log guest PC + owning mapping on SIGSEGV to locate crashes
++// under binary translation where crash_dump cannot run.
++static void
++pm_segv_handler(int sig, siginfo_t* info, void* ucvp)
++{
++  ucontext_t* uc = (ucontext_t*)ucvp;
++  unsigned long pc = (unsigned long)uc->uc_mcontext.pc;
++  unsigned long lr = (unsigned long)uc->uc_mcontext.regs[30];
++  unsigned long sp = (unsigned long)uc->uc_mcontext.sp;
++  unsigned long fault = (unsigned long)info->si_addr;
++  unsigned long x0 = (unsigned long)uc->uc_mcontext.regs[0];
++  unsigned long x1 = (unsigned long)uc->uc_mcontext.regs[1];
++  unsigned long x2 = (unsigned long)uc->uc_mcontext.regs[2];
++  unsigned long x3 = (unsigned long)uc->uc_mcontext.regs[3];
++  unsigned long x4 = (unsigned long)uc->uc_mcontext.regs[4];
++  __android_log_print(ANDROID_LOG_FATAL, "PMCRASH",
++    "SIGSEGV fault=%lx pc=%lx lr=%lx sp=%lx", fault, pc, lr, sp);
++  __android_log_print(ANDROID_LOG_FATAL, "PMCRASH",
++    "x0=%lx x1=%lx x2=%lx x3=%lx x4=%lx", x0, x1, x2, x3, x4);
++  // print maps regions containing any register value that looks like a pointer
++  unsigned long cand[8];
++  cand[0]=pc; cand[1]=lr; cand[2]=x0; cand[3]=x1;
++  cand[4]=x2; cand[5]=x3; cand[6]=x4; cand[7]=fault;
++  static char maps[262144];
++  int fd = open("/proc/self/maps", O_RDONLY);
++  if (fd >= 0) {
++    ssize_t total = 0;
++    for (;;) {
++      ssize_t n = read(fd, maps + total, sizeof(maps) - 1 - total);
++      if (n <= 0) break;
++      total += n;
++      if (total >= (ssize_t)sizeof(maps) - 1) break;
++    }
++    close(fd);
++    if (total > 0) {
++      maps[total] = 0;
++      char* p = maps;
++      while (*p) {
++        char* nl = (char*)strchr(p, '\n');
++        if (nl) *nl = 0;
++        unsigned long lo, hi;
++        if (sscanf(p, "%lx-%lx", &lo, &hi) == 2) {
++          if (pc >= lo && pc < hi) {
++            __android_log_print(ANDROID_LOG_FATAL, "PMCRASH",
++              "pc region %s (pc off %lx)", p, pc - lo);
++          }
++          for (int i = 0; i < 8; i++) {
++            if (cand[i] >= lo && cand[i] < hi && cand[i] != pc) {
++              __android_log_print(ANDROID_LOG_FATAL, "PMCRASH",
++                "x%d=%lx in %s (off %lx)", i, cand[i], p, cand[i] - lo);
++            }
++          }
++        }
++        if (!nl) break;
++        p = nl + 1;
++      }
++    }
++  }
++  signal(sig, SIG_DFL);
++  raise(sig);
++}
++
++static void
++pm_install_crash_handler()
++{
++  struct sigaction sa;
++  memset(&sa, 0, sizeof(sa));
++  sa.sa_sigaction = pm_segv_handler;
++  sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND;
++  sigaction(SIGSEGV, &sa, nullptr);
++}
 +#else
 +#define PM_XRELOG(...)
++static void pm_install_crash_handler() {}
 +#endif
 +
  nsresult
@@ -1602,7 +2947,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    nsresult rv = NS_OK;
    NS_ASSERTION(mScopedXPCOM, "Scoped xpcom not initialized.");
  
-@@ -3547,6 +3555,7 @@ XREMain::XRE_mainRun()
+@@ -3547,6 +3632,7 @@ XREMain::XRE_mainRun()
  #endif
  
    rv = mScopedXPCOM->SetWindowCreator(mNativeApp);
@@ -1610,7 +2955,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
  
    if (mStartOffline) {
-@@ -3559,9 +3568,12 @@ XREMain::XRE_mainRun()
+@@ -3559,9 +3645,12 @@ XREMain::XRE_mainRun()
    {
      nsCOMPtr<nsIObserver> startupNotifier
        (do_CreateInstance(NS_APPSTARTUPNOTIFIER_CONTRACTID, &rv));
@@ -1623,7 +2968,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    }
  
    nsCOMPtr<nsIAppStartup> appStartup
-@@ -3668,10 +3680,12 @@ XREMain::XRE_mainRun()
+@@ -3668,10 +3757,12 @@ XREMain::XRE_mainRun()
    // As FilePreferences need the profile directory, we must initialize right here.
    mozilla::FilePreferences::InitDirectoriesWhitelist();
    mozilla::FilePreferences::InitPrefs();
@@ -1636,7 +2981,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
  
    nsCOMPtr<nsICommandLineRunner> cmdLine;
  
-@@ -3685,6 +3699,7 @@ XREMain::XRE_mainRun()
+@@ -3685,6 +3776,7 @@ XREMain::XRE_mainRun()
  
      rv = cmdLine->Init(gArgc, gArgv, workingDir,
                         nsICommandLine::STATE_INITIAL_LAUNCH);
@@ -1644,7 +2989,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
      NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
  
      /* Special-case services that need early access to the command
-@@ -3692,7 +3707,9 @@ XREMain::XRE_mainRun()
+@@ -3692,7 +3784,9 @@ XREMain::XRE_mainRun()
      nsCOMPtr<nsIObserverService> obsService =
        mozilla::services::GetObserverService();
      if (obsService) {
@@ -1654,7 +2999,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
      }
    }
  
-@@ -3721,7 +3738,9 @@ XREMain::XRE_mainRun()
+@@ -3721,7 +3815,9 @@ XREMain::XRE_mainRun()
    SaveToEnv("XRE_BINARY_PATH=");
  
    if (!mShuttingDown) {
@@ -1664,7 +3009,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
      NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
  
  #if defined(HAVE_DESKTOP_STARTUP_ID) && defined(MOZ_WIDGET_GTK)
-@@ -3751,17 +3770,22 @@ XREMain::XRE_mainRun()
+@@ -3751,17 +3847,22 @@ XREMain::XRE_mainRun()
        mozilla::services::GetObserverService();
      if (obsService)
        obsService->NotifyObservers(nullptr, "final-ui-startup", nullptr);
@@ -1687,7 +3032,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    }
  
    if (!mShuttingDown) {
-@@ -3789,7 +3813,9 @@ XREMain::XRE_mainRun()
+@@ -3789,7 +3890,9 @@ XREMain::XRE_mainRun()
  #endif /* MOZ_INSTRUMENT_EVENT_LOOP */
  
    {
@@ -1697,7 +3042,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
      if (NS_FAILED(rv)) {
        NS_ERROR("failed to run appstartup");
        gLogConsoleErrors = true;
-@@ -3826,6 +3852,7 @@ void XRE_GlibInit()
+@@ -3826,6 +3929,7 @@ void XRE_GlibInit()
  int
  XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
  {
@@ -1705,10 +3050,11 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    ScopedLogging log;
  
    char aLocal;
-@@ -3873,12 +3900,16 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
+@@ -3873,12 +3977,17 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
  
    // init
    bool exit = false;
++  pm_install_crash_handler();
 +  PM_XRELOG("XRE_mainInit");
    int result = XRE_mainInit(&exit);
 +  PM_XRELOG("XRE_mainInit result=%d exit=%d", result, (int)exit);
@@ -1722,7 +3068,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    if (result != 0 || exit)
      return result;
  
-@@ -3889,10 +3920,13 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
+@@ -3889,10 +3998,13 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
    if (!mScopedXPCOM)
      return 1;
  
@@ -1736,7 +3082,7 @@ index 0ed2c3e6c8..fc5c51f9bb 100644
    rv = XRE_mainRun();
  
  #ifdef MOZ_INSTRUMENT_EVENT_LOOP
-@@ -4018,7 +4052,14 @@ XRE_InitCommandLine(int aArgc, char* aArgv[])
+@@ -4018,7 +4130,14 @@ XRE_InitCommandLine(int aArgc, char* aArgv[])
    delete[] canonArgs;
  #endif
  
@@ -1836,6 +3182,37 @@ index 633c56e26d..db23a21894 100644
  elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
      UNIFIED_SOURCES += [
          'win/nsMIMEInfoWin.cpp',
+diff --git a/view/nsViewManager.cpp b/view/nsViewManager.cpp
+index fb7338a8aa..2bbc518eba 100644
+--- a/view/nsViewManager.cpp
++++ b/view/nsViewManager.cpp
+@@ -5,6 +5,12 @@
+ 
+ #define PL_ARENA_CONST_ALIGN_MASK (sizeof(void*)-1)
+ #include "plarena.h"
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMVM(...) __android_log_print(ANDROID_LOG_INFO, "GeckoVM", __VA_ARGS__)
++#else
++#define PMVM(...) do {} while (0)
++#endif
+ 
+ #include "nsAutoPtr.h"
+ #include "nsViewManager.h"
+@@ -447,6 +453,13 @@ nsViewManager::ProcessPendingUpdatesRecurse(nsView* aView,
+ void
+ nsViewManager::ProcessPendingUpdatesPaint(nsIWidget* aWidget)
+ {
++  {
++    static int sVmPaint = 0;
++    if (++sVmPaint <= 10 || sVmPaint % 60 == 0) {
++      PMVM("PendingUpdatesPaint #%d widget=%p needsPaint=%d",
++           sVmPaint, (void*)aWidget, (int)aWidget->NeedsPaint());
++    }
++  }
+   if (aWidget->NeedsPaint()) {
+     // If an ancestor widget was hidden and then shown, we could
+     // have a delayed resize to handle.
 diff --git a/widget/CompositorWidget.h b/widget/CompositorWidget.h
 index eb657ba7f3..66175fcba6 100644
 --- a/widget/CompositorWidget.h
@@ -1884,6 +3261,64 @@ index 059fa85100..701ed7baec 100644
  
  #define NS_IWIDGET_IID \
  { 0x06396bf6, 0x2dd8, 0x45e5, \
+diff --git a/xpcom/base/Logging.cpp b/xpcom/base/Logging.cpp
+index 37ccab83cb..6cd4d957da 100644
+--- a/xpcom/base/Logging.cpp
++++ b/xpcom/base/Logging.cpp
+@@ -27,6 +27,13 @@
+ #include <unistd.h>
+ #endif
+ 
++#ifdef MOZ_WIDGET_ANDROID
++#include <android/log.h>
++#define PMLOGLOG(...) __android_log_print(ANDROID_LOG_INFO, "PMLOG", __VA_ARGS__)
++#else
++#define PMLOGLOG(...)
++#endif
++
+ // NB: Initial amount determined by auditing the codebase for the total amount
+ //     of unique module names and padding up to the next power of 2.
+ const uint32_t kInitialModuleCount = 256;
+@@ -208,9 +215,12 @@ public:
+       }
+     }
+ 
++    PMLOGLOG("Init MOZ_LOG=%s MOZ_LOG_FILE=%s",
++             modules ? modules : "(null)", PR_GetEnv("MOZ_LOG_FILE"));
+     NSPRLogModulesParser(modules,
+         [&shouldAppend, &addTimestamp, &isSync, &rotate, &defaultLogLevel]
+             (const char* aName, LogLevel aLevel, int32_t aValue) mutable {
++          PMLOGLOG("module %s -> %d", aName, (int)aLevel);
+           if (strcmp(aName, "append") == 0) {
+             shouldAppend = true;
+           } else if (strcmp(aName, "timestamp") == 0) {
+@@ -360,6 +370,11 @@ public:
+ 
+   void Print(const char* aName, LogLevel aLevel, const char* aFmt, va_list aArgs)
+   {
++    static int sPmLogPrints = 0;
++    if (++sPmLogPrints < 10) {
++      PMLOGLOG("Print #%d %s %d out=%p", sPmLogPrints, aName, (int)aLevel,
++               (void*)stderr);
++    }
+     const size_t kBuffSize = 1024;
+     char buff[kBuffSize];
+ 
+diff --git a/xpcom/base/Logging.h b/xpcom/base/Logging.h
+index 59eb5c1450..fcfe46b803 100644
+--- a/xpcom/base/Logging.h
++++ b/xpcom/base/Logging.h
+@@ -21,7 +21,9 @@
+ // work progresses more functionality will be swapped out in favor of
+ // mozilla logging implementations.
+ 
+-#ifdef DEBUG
++// Android release builds disable logging upstream for binary size; this port
++// is a bring-up build where native logging is essential, so keep it enabled.
++#if defined(ANDROID) || defined(DEBUG)
+ #define MOZ_LOGGING_ENABLED 1
+ #else
+ #define MOZ_LOGGING_ENABLED 0
 diff --git a/xpcom/base/nsConsoleService.cpp b/xpcom/base/nsConsoleService.cpp
 index 761bcc79b3..4edb30f380 100644
 --- a/xpcom/base/nsConsoleService.cpp

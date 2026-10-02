@@ -302,6 +302,7 @@ class GeckoLayerClient implements LayerView.Listener, PanZoomTarget
             // LayerView background can be removed.
             if (mView.getPaintState() == LayerView.PAINT_START) {
                 mView.setPaintState(LayerView.PAINT_BEFORE_FIRST);
+                android.util.Log.i("PMSURF", "contentDocumentChanged -> PAINT_BEFORE_FIRST");
             }
         }
 

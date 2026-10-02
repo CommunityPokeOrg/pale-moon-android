@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-10-01 (APK rebranded to **New Moon** — package `org.palemoon.community`, label "New Moon", `newmoon-52.6.0` APK — installs and launches on an Android 34 emulator; `XRE_mainRun` reaches steady state with the Fennec XUL chrome parsed and XBL-cached; content page loads are not yet confirmed to execute — see below)._
+_Last updated: 2026-10-01 (APK rebranded to **New Moon** — package `org.palemoon.community`, label "New Moon", `newmoon-52.6.0` APK — installs, launches, and now **renders composited page content on-screen**: the presentation pipeline works end-to-end (raster → tiles → TextureHost → DrawQuad → EGL swap → BLAST surface → display), screenshot-verified with a red test page showing "RED TEST 123" under the Fennec chrome. Three separate surface-pipeline defects were root-caused and fixed; one interim workaround (on-top z-order) is documented below)._
 
 ## Verified
 
@@ -201,6 +201,36 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
   The first-ever HTTPS attempt appeared to stall at `START` for
   several minutes — first-use NSS/certdb initialization under
   translation is extremely slow; a subsequent run completed normally.
+- **Internal rendering verified via captured thumbnail (2026-10-01).**
+  `browser.db`'s `thumbnails` table holds real PNGs produced by the
+  thumbnail pipeline: the extracted `https://example.com` capture
+  (441x368 RGBA) shows correctly laid-out, text-shaped page content —
+  layout, text shaping, and paint all work inside Goanna. The visible
+  LayerView surface was still blank at that point, so the remaining
+  gap is presenting composited frames to the SurfaceView, not
+  rendering.
+- **Compositor/presentation verified on-screen (2026-10-01).** A
+  `file:///` test page with a solid red background and large text
+  renders on the device: screencap shows the red page with
+  "RED TEST 123" glyphs composited by Goanna under the Fennec chrome
+  (URL bar, tab counter). The full chain works: `EndFrame` GL
+  readbacks inside `CompositorOGL` show the real frame pixels
+  (`center=ff0000ff`), `eglSwapBuffers` succeeds on the EGLSurface
+  bound to the java `Surface`, buffers latch into the in-scene
+  `SurfaceView[...](BLAST)` layer (`activeBuffer` populated,
+  `dequeueTime` tracking frames), and the display shows them. Three
+  defects were root-caused and fixed to get here (see root causes
+  6–8); the remaining presentation caveat is the interim on-top
+  z-order (see caveats).
+- **targetSdk=24 verified installed.** `pm install` of the rebuilt APK
+  on the Android 34 emulator reports `minSdk=15 targetSdk=24`. The
+  system still shows `DeprecatedTargetSdkVersionDialog` (it fires for
+  targetSdk < the notice threshold, ~API 31 on A14), but unlike the
+  earlier wedge it IS dismissible via `input tap` — at real display
+  coordinates (1080x2400, not scaled screenshot space): the OK button
+  at roughly (898,1461) dismisses it and focus returns to BrowserApp.
+  The coordinate-scaling detail explains earlier 'input doesn't work'
+  observations.
 - **All observed chrome JS errors resolved.** After `browser.xul`
   loads, the GeckoConsole bridge showed a cascade of JS errors — every
   one root-caused and fixed (see root causes): unpreprocessed
@@ -280,21 +310,88 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
    (`ExtensionContent` — killed the entire `content.js` frame script,
    `PresentationDeviceInfoManager`, `SimpleServiceDiscovery` —
    replaced with a lazy stub so casting code no-ops cleanly).
+6. **Cross-allocator free in `nsDataHandler::ParseURI`** —
+   `netwerk/protocol/data/nsDataHandler.cpp` `malloc`'d via
+   `PL_strndup` (scudo on Android) and released with jemalloc `free()`
+   → deterministic SIGSEGV inside `data:`/`file:` URI handling after
+   first paint. Fixed: `free(buffer)` → `PL_strfree(buffer)`.
+   Verified: process survives indefinitely past the first page.
+7. **SurfaceView layer subtree orphaned by a BLAST sync timeout** —
+   on BLAST-era Android the `SurfaceView`/`(BLAST)`/`Background for
+   SurfaceView` layers were all in SurfaceFlinger's *orphan* list
+   (verified via `dumpsys SurfaceFlinger`), so correctly-swapped
+   buffers latched into a dead layer and the screen showed only the
+   app window. `logcat` showed `BLASTSyncEngine: Sync group N
+   timeout — Unfinished container: ActivityRecord{.../.App}`: the WMS
+   blast-sync timed out while the app's UI thread (== the Gecko main
+   thread) was still busy ~5 min in libxul init under ndk_translation.
+   Fix (Java): `LayerView.updateCompositor` force-recreates the
+   surface once (`setVisibility(GONE)` + posted `VISIBLE`) before
+   first compositor creation so WMS registers a live subtree — the
+   recreated `SurfaceView` layers land in the scene graph (verified).
+8. **`CompositorOGL::Resume()` never renewed the EGL surface on
+   Android** — the `gl()->RenewSurface()` call was gated
+   `#if defined(MOZ_WIDGET_UIKIT)` (iOS-only). After every surface
+   destroy/create cycle (background→foreground, rotation, the forced
+   recreate) the compositor kept swapping into the stale
+   `EGLSurface`/`ANativeWindow` → the new in-scene BLAST queue stayed
+   empty (`activeBuffer=[0x0]`) while `eglSwapBuffers` still returned
+   success. Enabled the renew path for `MOZ_WIDGET_ANDROID`:
+   `RenewSurface` → `CreateSurfaceForWindow` re-reads the current
+   java `Surface` (`GET_JAVA_SURFACE`) and builds a fresh
+   `ANativeWindow` + `EGLSurface` — verified by `GeckoEGL` logs and
+   buffers latching into the *new* BLAST layer after resume.
 
 ## Unverified / partial (honest caveats)
 
-- **No user interaction verified.** The app reaches steady state,
-  renders, and completes real HTTP/HTTPS navigations driven by VIEW
-  intents, but taps/typing are untested because the emulator's
-  `system_server` ANR dialogs (and the recurring "built for an older
-  version of Android" notice for targetSdk=23) block input dispatch.
-  Driving the UI interactively needs a real arm64 device or a KVM
-  host.
+- **User interaction mostly unverified.** Dismissing the system
+  deprecated-SDK dialog via `input tap` works (at real display
+  coordinates), but a swipe on the app's own content area triggered an
+  input-dispatch ANR — consistent with the emulator's overall wedge
+  under ndk_translation load (system_server also ANRs at the same
+  time), not necessarily an app bug. Typing a URL / tapping a link
+  remains untested; needs a real arm64 device or a KVM host.
 - **Compositor depth is partially verified.** `nsWindow`,
   `nsAppShell`, the docshell/viewer path, and full tab lifecycle
-  events (incl. THUMBNAIL captures of loaded pages) all execute;
-  screenshots confirm the chrome UI but loaded content pages have not
-  been screenshot-verified past the persistent system dialog overlay.
+  events all execute; the extracted tab thumbnail proves pages are
+  genuinely rasterized (layout+paint work).
+- **Paint pipeline verified end-to-end (2026-10-01).**
+  Android-gated logcat probes across the whole layers stack show the
+  full pipeline executing every frame:
+  `FrameLayerBuilder::DrawPaintedLayer` paints the real display items
+  (items=2, full-viewport 1080x2083 dirty rect) into the multi-tiled
+  `ClientMultiTiledLayerBuffer`; all 15 512x512 tiles pass
+  `ValidateTile` with live borrowed DrawTargets; IPC delivers
+  `UseTiledLayerBuffer` (res=1.0, 15 textured tiles); the compositor
+  deserializes real `BufferTextureHost`s per tile and
+  `TiledContentHost::RenderTile` binds TextureSources + issues
+  `DrawQuad` for all 15 tiles each composited frame. A red-background
+  test page produces the identical trace — rasterization, tiling,
+  IPC, and quad emission all work. The earlier suspects (texture
+  upload, quad culling) were exonerated: `EndFrame` GL readbacks show
+  correct pixels, and the pixel loss turned out to be entirely in
+  SurfaceFlinger registration/z-order (root causes 7–8 above).
+  Separately fixed: ndk_translation ANR storms were caused by guest
+  `mprotect` → `FlushGuestCodeCache` mutex storms — mitigated by
+  disabling JS JIT tiers + `MALLOC_OPTIONS` env.
+- **Interim workaround: surface composites ON TOP of the window.**
+  With the normal below-window ordering, the recreated in-scene
+  BLAST layer correctly latches frames (verified) but the display
+  still shows the app window's pixels in the content region: the
+  transparent-region "hole punch" the SurfaceView should carve in
+  the window surface is never applied on this stack
+  (`TransparentRegion count=0` in the SF dump for both this app and
+  a minimal working control app — and the control app works, so the
+  window-side cover is what differs; a white windowBackground was
+  ruled out by switching it to transparent with no change). As an
+  interim, `LayerSurfaceView` uses `setZOrderOnTop(true)`, which is
+  verified to display Goanna-composited content correctly. Known
+  consequence: UI drawn inside the app window *over* the content
+  area (tabs-panel drawer, form-assist popup, text-selection
+  handles) is covered by the surface; popup *windows* (menus,
+  doorhangers) are unaffected. Proper fix candidates: get the
+  window transparent-region punch applied, or complete the
+  (upstream-disabled) TextureView path which composites in-window.
 - **Rebranded to unofficial "New Moon" identity** (2026-10-01):
   `MOZ_APP_BASENAME=NewMoon`, `MOZ_APP_VENDOR=Moonchild`,
   `ANDROID_PACKAGE_NAME=org.palemoon.community`, display name
@@ -342,12 +439,17 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
 
 ## Known missing pieces (next work)
 
-1. **Interactive verification on a real arm64 device** (or a faster
+1. ~~Fix content presentation to LayerView~~ — **done** (2026-10-01):
+   composited page content reaches the display (root causes 7–8 +
+   on-top interim). Remaining polish: restore below-window ordering
+   (transparent-region punch or TextureView) so in-window overlays
+   aren't covered by the content surface.
+2. **Interactive verification on a real arm64 device** (or a faster
    emulator host): page loads via intent are verified (HTTP + HTTPS
    with full tab lifecycle); remaining is *interactive* use — typing
-   URLs, tapping links — blocked on this emulator by ANR dialogs and
-   the targetSdk=23 notice; watch for ndk_translation-specific
-   behavior that won't reproduce on hardware.
+   URLs, tapping links — blocked on this emulator by ANR wedges; watch
+   for ndk_translation-specific behavior that won't reproduce on
+   hardware.
 2. ~~Pale Moon branding/product pass~~ — done (unofficial "New Moon"
    branding + Pale Moon app GUID/UA); official "Pale Moon" branding
    needs Moonchild's permission and remains available via

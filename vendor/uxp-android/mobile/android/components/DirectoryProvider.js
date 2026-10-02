@@ -185,22 +185,30 @@ DirectoryProvider.prototype = {
     let directories = [];
     let jenv = null;
 
+    // PMJCL: js-ctypes variadic JNI calls SIGSEGV under ndk_translation;
+    // distribution dirs are always empty for this build, skip JNI entirely.
+    return directories;
     try {
+      Cu.reportError("PMJCL DistJNI: enter");
       jenv = JNI.GetForThread();
+      Cu.reportError("PMJCL DistJNI: got env");
 
       let jDistribution = JNI.LoadClass(jenv, "org.mozilla.gecko.distribution.Distribution", {
         static_methods: [
           { name: "getDistributionDirectories", sig: "()[Ljava/lang/String;" }
         ],
       });
+      Cu.reportError("PMJCL DistJNI: class loaded");
 
       let jDirectories = jDistribution.getDistributionDirectories();
+      Cu.reportError("PMJCL DistJNI: dirs=" + jDirectories);
 
       for (let i = 0; i < jDirectories.length; i++) {
         directories.push(new FileUtils.File(
           JNI.ReadString(jenv, jDirectories.get(i))
         ));
       }
+      Cu.reportError("PMJCL DistJNI: read " + directories.length);
     } finally {
       if (jenv) {
         JNI.UnloadClasses(jenv);
