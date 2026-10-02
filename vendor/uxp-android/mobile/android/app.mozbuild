@@ -11,6 +11,18 @@ if CONFIG['ENABLE_TESTS']:
 if CONFIG['MOZ_EXTENSIONS']:
     DIRS += ['/extensions']
 
+if CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
+    # Package the desktop Pale Moon chrome (browser.xul, components,
+    # locale, theme) instead of the Fennec mobile chrome.
+    DIRS += [
+        '/palemoon/app',
+        '/palemoon/base',
+        '/palemoon/components',
+        '/palemoon/locales',
+        '/palemoon/modules',
+        '/palemoon/themes',
+    ]
+
 DIRS += [
     '/%s' % CONFIG['MOZ_BRANDING_DIRECTORY'],
     '/mobile/android',

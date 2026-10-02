@@ -1,6 +1,8 @@
 # Status
 
-_Last updated: 2026-10-02 (**androidx migration landed**: the entire Java frontend was migrated off the legacy `android.support.*` libraries onto androidx (~38 AARs fetched from Google's maven repo into `$ANDROID_HOME/extras/androidx/m2repository`, resolved by `build/autoconf/android.m4` into `ANDROIDX_EXTRA_JARS`/`ANDROIDX_EXTRA_RES_DIRS`/`ANDROIDX_EXTRA_PACKAGES`). All jars compile, and the resulting APK now needs multidex — `MOZ_ANDROID_MIN_SDK_VERSION` was bumped 15→21 so D8 auto-partitions into `classes.dex`/`classes2.dex`/`classes3.dex` (the APK assembler and package manifest were updated to carry all dex files). Verified on the emulator: BrowserApp displays, TLS handshake + cert verification work, the OpenGL compositor initializes, and no class-loading failures occur. Gradle remains make-driven; the Gradle path is still unused.)_
+_Last updated: 2026-10-02 (**desktop Pale Moon XUL chrome bring-up**: `--enable-palemoon-desktop-chrome` now compiles the vendored `palemoon/` tree into the Android build and packages the desktop `browser.xul` chrome into the APK — replacing the Fennec mobile chrome for chrome name `browser`. On the emulator the desktop chrome **loads and executes**: `browser.xul` document load, all overlay scripts (browser.js, placesOverlay.xul, controller.js, InlineSpellChecker.jsm, etc.) compile and run, `OnChromeLoaded` fires, PM chrome components (nsBrowserGlue, sessionstore, fuel, feeds, downloads) and the Places backend register, `palemoon.js` + `newmoon-branding.js` prefs land in `defaults/pref`, and the OpenGL compositor initializes on the 1080x2209 surface. **Not yet verified: first paint of the chrome window** — the XUL doc finishes loading but no EndFrame ever reaches the BLAST SurfaceView (buffer stays `0x0`), so the screen still shows the Java shell over a blank content region; see the "Desktop chrome" section below.)_
+
+_Previously (2026-10-02): **androidx migration landed**: the entire Java frontend was migrated off the legacy `android.support.*` libraries onto androidx (~38 AARs fetched from Google's maven repo into `$ANDROID_HOME/extras/androidx/m2repository`, resolved by `build/autoconf/android.m4` into `ANDROIDX_EXTRA_JARS`/`ANDROIDX_EXTRA_RES_DIRS`/`ANDROIDX_EXTRA_PACKAGES`). All jars compile, and the resulting APK now needs multidex — `MOZ_ANDROID_MIN_SDK_VERSION` was bumped 15→21 so D8 auto-partitions into `classes.dex`/`classes2.dex`/`classes3.dex` (the APK assembler and package manifest were updated to carry all dex files). Verified on the emulator: BrowserApp displays, TLS handshake + cert verification work, the OpenGL compositor initializes, and no class-loading failures occur. Gradle remains make-driven; the Gradle path is still unused.)_
 
 _Previously (2026-10-01): APK rebranded to **New Moon** — package `org.palemoon.community`, label "New Moon", `newmoon-52.6.0` APK — installs, launches, and now **renders composited page content on-screen**: the presentation pipeline works end-to-end (raster → tiles → TextureHost → DrawQuad → EGL swap → BLAST surface → display), screenshot-verified with a red test page showing "RED TEST 123" under the Fennec chrome. Three separate surface-pipeline defects were root-caused and fixed; one interim workaround (on-top z-order) is documented below._
 
@@ -347,6 +349,93 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
    `ANativeWindow` + `EGLSurface` — verified by `GeckoEGL` logs and
    buffers latching into the *new* BLAST layer after resume.
 
+## Desktop Pale Moon chrome (`--enable-palemoon-desktop-chrome`)
+
+Goal: ship the desktop Pale Moon XUL chrome (vendored `palemoon/` tree)
+as the app chrome on Android instead of the Fennec mobile chrome.
+
+**Mechanics (all verified in-tree):**
+
+- `build/autoconf/android.m4`: `MOZ_ARG_ENABLE_BOOL` →
+  `MOZ_PALEMOON_DESKTOP_CHROME` + `AC_SUBST`; registered in
+  `build/moz.configure/old.configure` `@old_configure_options`.
+- `mobile/android/app.mozbuild`: under the flag, DIRS gains
+  `/palemoon/app`, `/palemoon/base`, `/palemoon/components`,
+  `/palemoon/locales`, `/palemoon/modules`, `/palemoon/themes`.
+  `palemoon/app/moz.build` ships prefs/profile bits but its desktop
+  `GeckoProgram` and all non-Android-safe pieces are gated on
+  `OS_TARGET != 'Android'`; `palemoon/app/Makefile.in` `libs::`
+  desktop-binary steps are likewise gated. `palemoon/components`
+  builds into libxul (`FINAL_LIBRARY='xul'`, module renamed
+  `nsPalemoonCompsModule` to avoid the toolkit collision) with the
+  directory provider, feeds, and shell-service subdirs enabled.
+- `package-manifest.in`: under the flag, `browser.jar` +
+  `browser.manifest` replace `chrome.jar` (the three PM jar.mn trees —
+  base, locales, themes — all merge into `browser.jar`); `palemoon.js`
+  + `newmoon-branding.js` land in `defaults/pref`; PM chrome JS
+  components (BrowserComponents.manifest, nsBrowserGlue,
+  nsSessionStartup/Store, fuel, status4evar, feeds, downloads,
+  nsAboutRedirector, nsBrowserContentHandler) and their `.xpt`s are
+  packaged; the Places backend JS components +
+  `toolkitplaces.manifest` + `places.xpt` are included (required by
+  PlacesUtils.jsm / placesOverlay.xul — without them the chrome fails
+  with `Ci.nsINavHistoryResultNode is undefined`).
+- `mobile/android/moz.build` + `mobile/android/components/moz.build`
+  gate the Fennec chrome jar and the mobile chrome-JS components under
+  the flag (mobile chrome jar is still produced but no longer
+  registered for `browser`).
+- New branding bits: `mobile/android/branding/newmoon/locales/en-US/
+  browserconfig.properties` (homepage = about:home; palemoon.js points
+  `browser.startup.homepage` at
+  `chrome://branding/locale/browserconfig.properties`) and
+  `pref/newmoon-branding.js` (`startup.homepage_welcome_url` etc.).
+
+**Verified (emulator, Android 34 x86_64 + ndk_translation):**
+
+- `./mach build && ./mach package` produce a signed 38.9 MB
+  `newmoon-52.6.0.linux-android-aarch64.apk` (apksigner-verified,
+  installs via `pm install -r`).
+- omni.ja contains desktop `chrome/browser/content/browser/*` (322
+  files), `chrome/en-US/locale/browser/*`, skin `classic/1.0`,
+  merged `chrome.manifest`/`components.manifest`/`interfaces.xpt`,
+  and all PM + Places components; zero Fennec `chrome/chrome/` entries.
+- Runtime (logcat pid of `org.palemoon.community`): XRE brings up the
+  top window at `chrome://browser/content/browser.xul`,
+  `StartDocumentLoad` + `OnChromeLoaded` fire, every overlay script
+  compiles and executes (`CloneAndExecuteScript ok=1` for dozens of
+  scripts incl. InlineSpellChecker.jsm via the JS component loader),
+  `PMCOMP CreateCompositor w=1080 h=2209` + EGL surface + "OpenGL
+  compositor Initialized Succesfully" (SwiftShader ES 3.0). The
+  process stays alive at steady state after scripts complete.
+- Fixed en route: browser.manifest packaging (chrome package
+  registration), palemoon/app DIRS inclusion (default prefs), Places
+  component packaging (nsINavHistoryResultNode XPT), blocklist/
+  ua-update.json manifest collision with mobile/android's own copies,
+  desktop-exe Makefile steps on Android.
+
+**Not verified / current blocker:**
+
+- **No first paint of the chrome window.** After scripts finish, the
+  process idles with nothing latched to the BLAST SurfaceView
+  (`buffer=0x0`, `size=(0,0)`, `TransparentRegion count=0`); no
+  `EndFrame`/`NeedsPaint` activity for the chrome widget. Screen shows
+  the Java shell (URL bar) over a blank region. The tab content widget
+  (type=4) reports `needsPaint=0`, `lm=0x0` — its layer manager is
+  never created. Whether the chrome document builds its frame tree /
+  refresh driver ticks, or desktop `browser.js` startup stalls before
+  first reflow, is the next thing to instrument (the recurring
+  system_server ANR dialog also keeps overlaying the screen under
+  ndk_translation and may starve frame delivery).
+- Residual non-fatal errors: `browser-clh` contract→CID warning
+  (Fennec's `be623d20` BrowserCLH CID stays in merged
+  components.manifest while its impl is excluded — benign), the
+  `browser.startup.homepage`/`startup.homepage_welcome_url`
+  FILE_NOT_FOUND fixed by the new branding files above, a moz-icon
+  gtk warning, and a GMPInstallManager lazy-import failure.
+- Interactivity is entirely unadapted (menubar→Android, window.open,
+  hover, keyboard shortcuts, toolbox layout at phone width); see
+  docs/XUL-ON-ANDROID.md for the mapping assessment.
+
 ## Unverified / partial (honest caveats)
 
 - **User interaction mostly unverified.** Dismissing the system
@@ -474,8 +563,11 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
    javac/aapt2/D8 still does the build; `gradle/` is vestigial),
    targetSdk 23→34 (requires runtime-permission handling), and a
    stale `android.support.v4.app.Fragment` keep in proguard.cfg.
-4. Desktop Pale Moon browser chrome (`browser/` XUL) on Android, if the
-   mobile Fennec chrome is deemed insufficient for the "full Pale Moon
-   UI" goal — large effort; the Fennec chrome is already XUL/XBL and
-   fully executing.
+4. **First paint of the desktop chrome window** (see the Desktop
+   chrome section): instrument why the loaded `browser.xul` document
+   never issues a frame (refresh driver / frame-tree build vs.
+   `browser.js` startup stall vs. emulator starvation), then fix.
+   After that: Android-ize the desktop chrome's interaction model
+   (menubar→overflow menu, no hover/keyboard deps, toolbox layout at
+   phone width).
 5. Release signing path + l10n/crashreporter overrides audit.

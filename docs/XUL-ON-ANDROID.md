@@ -21,8 +21,13 @@ Two different things are often conflated:
    (`mobile/android/chrome/content/browser.xul`) containing only a
    `<deck id="browsers">` that hosts `<browser>` elements for tab content.
 
-This port currently ships the Fennec chrome: Java toolbar/tabs/menus + the
-minimal XUL deck. It is **not** the desktop Pale Moon UI.
+As of 2026-10-02 the tree supports **both**: the default build ships the
+Fennec chrome (Java toolbar/tabs/menus + the minimal XUL deck), and
+`--enable-palemoon-desktop-chrome` builds an APK where chrome name
+`browser` resolves to the desktop `palemoon/` XUL chrome
+(`chrome://browser/content/browser.xul`). The desktop-chrome build
+loads and executes its XUL on-device — it does not yet paint (see
+STATUS.md).
 
 ## Verified working (on-device)
 
@@ -62,9 +67,11 @@ minimal XUL deck. It is **not** the desktop Pale Moon UI.
 - User interaction: the emulator wedges its input dispatch under
   ndk_translation load (system_server ANRs), so taps/keys cannot be
   tested. Interactive verification needs a real arm64 device.
-- First paint of rendered web content in the LayerView surface
-  (navigation events and THUMBNAIL captures fire; pixels behind the
-  persistent system notice dialog are unconfirmed).
+- **First paint of the desktop chrome window** (desktop-chrome build):
+  `browser.xul` loads, its scripts execute, the compositor initializes,
+  but no frame ever reaches the surface — next instrumentation target.
+- First paint of rendered web content in the LayerView surface was
+  verified 2026-10-01 (red test page rendered on-screen).
 
 ## How well does XUL map to Android?
 
@@ -100,18 +107,27 @@ Fennec Java shell for Android OS integration (intents, lifecycle,
 downloads, notifications) and load the desktop `browser.xul` chrome into
 the LayerView surface as the app's XUL window — i.e., what Fennec does
 with its minimal XUL doc, but pointing at the Pale Moon chrome and adding
-the missing widget/theme/menu glue. Session estimate: roughly 1–3
-sessions of focused work on top of a working content-load pipeline, with
-menu/input/theme adaptation being the hard part.
+the missing widget/theme/menu glue. **2026-10-02 update: the plumbing
+half of this is now verified working.** `--enable-palemoon-desktop-chrome`
+swaps `browser.jar`+`browser.manifest`+`palemoon.js`+PM components into
+the APK; on-device the desktop chrome resolves, loads, and runs its full
+script set (browser.js + overlay scripts, InlineSpellChecker.jsm,
+sessionstore, feeds, places) with no fatal chrome/registry/prefs/XPT
+errors. The remaining gap is exactly the rendering/input half: the
+desktop chrome window does not yet paint, and menus/keyboard/hover/
+window-management remain unadapted.
 
 ## Current stance
 
-- Shipping now: full Goanna/UXP platform + Fennec mobile chrome
+- Shipping by default: full Goanna/UXP platform + Fennec mobile chrome
   (Java UI + minimal XUL document) + New Moon branding.
-- Target: desktop Pale Moon chrome rendered in-chrome, gated on (a)
-  content loads verified working and (b) widget/theme glue.
-- Honest bottom line: XUL itself runs fine on Android — the Fennec XUL
-  document, its bindings, its chrome JS, and real page loads all work.
-  The open work is compositor pixel-verification, interactive input,
-  and desktop-chrome substitution — none of which are architectural
-  blockers.
+- Available via flag: desktop Pale Moon chrome that compiles, packages,
+  resolves, and executes its XUL/JS on-device; first paint of the
+  chrome window is the open blocker (may be an ordinary paint-path
+  bug rather than an architecture mismatch — the Fennec chrome's
+  content surface paints fine).
+- Honest bottom line: XUL itself runs fine on Android — both the Fennec
+  XUL document and the full desktop `browser.xul` chrome load, run, and
+  reach steady state. The open work is desktop-chrome first paint,
+  interactive input, and menu/window adaptation — none of which are
+  architectural blockers.

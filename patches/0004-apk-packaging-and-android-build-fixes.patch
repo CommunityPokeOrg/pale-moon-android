@@ -34,6 +34,18 @@ index 14182ad551..27721adcef 100644
  option('--enable-replace-malloc',
         help='Enable ability to dynamically replace the malloc implementation')
  
+diff --git a/build/moz.configure/old.configure b/build/moz.configure/old.configure
+index 87f7910dff..80a3369fea 100644
+--- a/build/moz.configure/old.configure
++++ b/build/moz.configure/old.configure
+@@ -170,6 +170,7 @@ def old_configure_options(*options):
+     '--enable-official-vendor',
+     '--enable-oom-breakpoint',
+     '--enable-optimize',
++    '--enable-palemoon-desktop-chrome',
+     '--enable-parental-controls',
+     '--enable-pie',
+     '--enable-png-arm-neon-support',
 diff --git a/build/subconfigure.py b/build/subconfigure.py
 index 397576050d..60c43cde35 100644
 --- a/build/subconfigure.py
@@ -2494,6 +2506,26 @@ index 5d97b6f1b8..b805d2b480 100644
    return NS_ERROR_NOT_AVAILABLE;
 +#endif
  }
+diff --git a/toolkit/components/satchel/moz.build b/toolkit/components/satchel/moz.build
+index cff8b594a3..c38ac82bfb 100644
+--- a/toolkit/components/satchel/moz.build
++++ b/toolkit/components/satchel/moz.build
+@@ -25,11 +25,14 @@ EXTRA_COMPONENTS += [
+ ]
+ 
+ EXTRA_JS_MODULES += [
+-    'AutoCompletePopup.jsm',
+     'FormHistory.jsm',
+     'nsFormAutoCompleteResult.jsm',
+ ]
+ 
++if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
++    # palemoon/modules installs its own tree-view-based AutoCompletePopup.jsm
++    EXTRA_JS_MODULES += ['AutoCompletePopup.jsm']
++
+ FINAL_LIBRARY = 'xul'
+ 
+ JAR_MANIFESTS += ['jar.mn']
 diff --git a/toolkit/components/search/nsSearchService.js b/toolkit/components/search/nsSearchService.js
 index 7b45e30644..77e29c3206 100644
 --- a/toolkit/components/search/nsSearchService.js
@@ -2777,6 +2809,47 @@ index 2cb47be3a6..9c3afe718b 100644
 +
  
  initTable = undefined;
+diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
+index 9c820e3b75..180a57cb38 100644
+--- a/toolkit/modules/moz.build
++++ b/toolkit/modules/moz.build
+@@ -20,7 +20,6 @@ EXTRA_JS_MODULES += [
+     'BrowserUtils.jsm',
+     'CanonicalJSON.jsm',
+     'CertUtils.jsm',
+-    'CharsetMenu.jsm',
+     'ClientID.jsm',
+     'Color.jsm',
+     'Console.jsm',
+@@ -47,10 +46,8 @@ EXTRA_JS_MODULES += [
+     'NewTabUtils.jsm',
+     'NLP.jsm',
+     'ObjectUtils.jsm',
+-    'PageMenu.jsm',
+     'PageMetadata.jsm',
+     'PermissionsUtils.jsm',
+-    'PopupNotifications.jsm',
+     'Preferences.jsm',
+     'PrivateBrowsingUtils.jsm',
+     'ProfileAge.jsm',
+@@ -112,6 +109,17 @@ if 'Android' != CONFIG['OS_TARGET']:
+         'subprocess',
+     ]
+ 
++if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
++    # The palemoon/ app ships its own versions of these under
++    # palemoon/modules; the desktop product installs them into
++    # browser/modules via DIST_SUBDIR so both exist. On Android the
++    # layout is flat, so the application's copies must win.
++    EXTRA_JS_MODULES += [
++        'CharsetMenu.jsm',
++        'PageMenu.jsm',
++        'PopupNotifications.jsm',
++    ]
++
+ 
+ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     EXTRA_JS_MODULES += [
 diff --git a/toolkit/moz.configure b/toolkit/moz.configure
 index 8dd507dcbb..dc86ef665f 100644
 --- a/toolkit/moz.configure

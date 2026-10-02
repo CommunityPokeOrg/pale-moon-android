@@ -493,30 +493,94 @@
 @BINPATH@/components/pipnss.xpt
 
 [mobile]
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/chrome/chrome@JAREXT@
+#endif
+#ifdef MOZ_PALEMOON_DESKTOP_CHROME
+; palemoon/base + components + themes jars all merge into browser.jar
+@BINPATH@/chrome/browser@JAREXT@
+@BINPATH@/chrome/browser.manifest
+@BINPATH@/@PREF_DIR@/palemoon.js
+@BINPATH@/@PREF_DIR@/newmoon-branding.js
+#endif
 @BINPATH@/chrome/chrome.manifest
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/AboutRedirector.js
+#endif
 @BINPATH@/components/AddonUpdateService.js
 @BINPATH@/components/BlocklistPrompt.js
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/BrowserCLH.js
+#endif
 @BINPATH@/components/ColorPicker.js
 @BINPATH@/components/ContentDispatchChooser.js
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/ContentPermissionPrompt.js
+#endif
 @BINPATH@/components/ImageBlockingPolicy.js
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/DirectoryProvider.js
+#endif
 @BINPATH@/components/FilePicker.js
 @BINPATH@/components/HelperAppDialog.js
 @BINPATH@/components/LoginManagerPrompter.js
 @BINPATH@/components/MobileComponents.manifest
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/MobileComponents.xpt
+#endif
 @BINPATH@/components/NSSDialogService.js
 @BINPATH@/components/PersistentNotificationHandler.js
 @BINPATH@/components/PresentationDevicePrompt.js
 @BINPATH@/components/PresentationRequestUIGlue.js
 @BINPATH@/components/PromptService.js
+#ifndef MOZ_PALEMOON_DESKTOP_CHROME
 @BINPATH@/components/SessionStore.js
+#endif
 @BINPATH@/components/SiteSpecificUserAgent.js
 @BINPATH@/components/Snippets.js
+
+#ifdef MOZ_PALEMOON_DESKTOP_CHROME
+; Desktop Pale Moon application components (palemoon/components)
+@BINPATH@/components/BrowserComponents.manifest
+@BINPATH@/components/nsAboutRedirector.js
+@BINPATH@/components/nsBrowserContentHandler.js
+@BINPATH@/components/nsBrowserGlue.js
+@BINPATH@/components/nsSessionStartup.js
+@BINPATH@/components/nsSessionStore.js
+@BINPATH@/components/nsSessionStore.manifest
+@BINPATH@/components/fuelApplication.js
+@BINPATH@/components/fuelApplication.manifest
+@BINPATH@/components/status4evar.js
+@BINPATH@/components/status4evar.manifest
+@BINPATH@/components/nsSetDefaultBrowser.js
+@BINPATH@/components/nsSetDefaultBrowser.manifest
+@BINPATH@/components/BrowserDownloads.manifest
+@BINPATH@/components/DownloadsStartup.js
+@BINPATH@/components/DownloadsUI.js
+@BINPATH@/components/BrowserFeeds.manifest
+@BINPATH@/components/FeedConverter.js
+@BINPATH@/components/WebContentConverter.js
+@BINPATH@/components/FeedWriter.js
+@BINPATH@/components/browsercompsbase.xpt
+@BINPATH@/components/sessionstore.xpt
+@BINPATH@/components/fuel.xpt
+@BINPATH@/components/status4evar.xpt
+@BINPATH@/components/browser-feeds.xpt
+
+; Places backend + places autocomplete components required by the
+; desktop chrome (palemoon assumes the full history/bookmarks stack)
+@BINPATH@/components/toolkitplaces.manifest
+@BINPATH@/components/places.xpt
+@BINPATH@/components/nsLivemarkService.js
+@BINPATH@/components/nsTaggingService.js
+@BINPATH@/components/nsPlacesExpiration.js
+@BINPATH@/components/PlacesCategoriesStarter.js
+@BINPATH@/components/ColorAnalyzer.js
+@BINPATH@/components/UnifiedComplete.js
+@BINPATH@/components/PageIconProtocolHandler.js
+@BINPATH@/components/nsPlacesAutoComplete.js
+@BINPATH@/components/nsPlacesAutoComplete.manifest
+#endif
 
 @BINPATH@/components/XPIDialogService.js
 

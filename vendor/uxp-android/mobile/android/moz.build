@@ -6,10 +6,13 @@
 
 CONFIGURE_SUBST_FILES += ['installer/Makefile']
 
-DIRS += [
-    '../locales',
-    'locales',
-]
+if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
+    # The Fennec locale jars register chrome 'browser' locale entries,
+    # which collide with the palemoon/locales jars.
+    DIRS += [
+        '../locales',
+        'locales',
+    ]
 
 if CONFIG['MOZ_ANDROID_MLS_STUMBLER']:
     DIRS += ['stumbler']
@@ -17,11 +20,21 @@ if CONFIG['MOZ_ANDROID_MLS_STUMBLER']:
 DIRS += [
     'javaaddons', # Must be built before base.
     'base',
-    'chrome',
+]
+
+if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
+    # 'chrome' and 'themes/core' produce jars that register the 'browser'
+    # content/skin chrome packages; the palemoon/ subtree registers its
+    # own jars for the same names when MOZ_PALEMOON_DESKTOP_CHROME is on.
+    DIRS += [
+        'chrome',
+        'themes/core',
+    ]
+
+DIRS += [
     'components',
     'extensions',
     'modules',
-    'themes/core',
     'app',
     'fonts',
 ]

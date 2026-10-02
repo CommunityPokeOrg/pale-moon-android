@@ -391,4 +391,13 @@ if test -n "$MOZ_ANDROID_MAX_SDK_VERSION"; then
     AC_SUBST(MOZ_ANDROID_MAX_SDK_VERSION)
 fi
 
+MOZ_ARG_ENABLE_BOOL(palemoon-desktop-chrome,
+[  --enable-palemoon-desktop-chrome
+                          Package the desktop Pale Moon XUL chrome
+                          (the palemoon/ subtree) as the app's chrome
+                          instead of the Fennec mobile chrome],
+    MOZ_PALEMOON_DESKTOP_CHROME=1,
+    MOZ_PALEMOON_DESKTOP_CHROME=)
+AC_SUBST(MOZ_PALEMOON_DESKTOP_CHROME)
+
 ])

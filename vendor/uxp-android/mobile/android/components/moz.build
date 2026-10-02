@@ -4,21 +4,22 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-XPIDL_SOURCES += [
-    'SessionStore.idl',
-]
+if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
+    # palemoon/components/sessionstore ships its own nsISessionStore
+    # with a different IID; only one may exist in the linked xpt.
+    # SessionStore.idl is this module's only source, so in palemoon
+    # mode the whole MobileComponents xpt is skipped.
+    XPIDL_SOURCES += [
+        'SessionStore.idl',
+    ]
 
-XPIDL_MODULE = 'MobileComponents'
+    XPIDL_MODULE = 'MobileComponents'
 
 EXTRA_COMPONENTS += [
-    'AboutRedirector.js',
     'AddonUpdateService.js',
     'BlocklistPrompt.js',
-    'BrowserCLH.js',
     'ColorPicker.js',
     'ContentDispatchChooser.js',
-    'ContentPermissionPrompt.js',
-    'DirectoryProvider.js',
     'FilePicker.js',
     'HelperAppDialog.js',
     'ImageBlockingPolicy.js',
@@ -28,12 +29,25 @@ EXTRA_COMPONENTS += [
     'PresentationDevicePrompt.js',
     'PresentationRequestUIGlue.js',
     'PromptService.js',
-    'SessionStore.js',
     'SiteSpecificUserAgent.js',
     'Snippets.js',
     'TabSource.js',
     'XPIDialogService.js',
 ]
+
+if not CONFIG['MOZ_PALEMOON_DESKTOP_CHROME']:
+    # These register contracts that the palemoon/ desktop components
+    # also provide (about: redirector, browser CLH, directory provider,
+    # content-permission prompt, session store). When the desktop chrome
+    # is packaged, its versions win and these are left out so they don't
+    # shadow them.
+    EXTRA_COMPONENTS += [
+        'AboutRedirector.js',
+        'BrowserCLH.js',
+        'ContentPermissionPrompt.js',
+        'DirectoryProvider.js',
+        'SessionStore.js',
+    ]
 
 # Keep it this way if at all possible.  If you need preprocessing,
 # consider adding fields to AppConstants.jsm.
