@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-10-02 (**desktop Pale Moon XUL chrome bring-up**: `--enable-palemoon-desktop-chrome` now compiles the vendored `palemoon/` tree into the Android build and packages the desktop `browser.xul` chrome into the APK — replacing the Fennec mobile chrome for chrome name `browser`. On the emulator the desktop chrome **loads and executes**: `browser.xul` document load, all overlay scripts (browser.js, placesOverlay.xul, controller.js, InlineSpellChecker.jsm, etc.) compile and run, `OnChromeLoaded` fires, PM chrome components (nsBrowserGlue, sessionstore, fuel, feeds, downloads) and the Places backend register, `palemoon.js` + `newmoon-branding.js` prefs land in `defaults/pref`, and the OpenGL compositor initializes on the 1080x2209 surface. **Not yet verified: first paint of the chrome window** — the XUL doc finishes loading but no EndFrame ever reaches the BLAST SurfaceView (buffer stays `0x0`), so the screen still shows the Java shell over a blank content region; see the "Desktop chrome" section below.)_
+_Last updated: 2026-10-02 (**desktop Pale Moon XUL chrome bring-up**: `--enable-palemoon-desktop-chrome` now compiles the vendored `palemoon/` tree into the Android build and packages the desktop `browser.xul` chrome into the APK — replacing the Fennec mobile chrome for chrome name `browser`. On the emulator the desktop chrome **loads and executes**: `browser.xul` document load, all overlay scripts (browser.js, placesOverlay.xul, controller.js, InlineSpellChecker.jsm, etc.) compile and run, `OnChromeLoaded` fires, PM chrome components (nsBrowserGlue, sessionstore, fuel, feeds, downloads) and the Places backend register, `palemoon.js` + `newmoon-branding.js` prefs land in `defaults/pref`, and the OpenGL compositor initializes on the 1080x2209 surface. **First paint verified 2026-10-02**: the chrome window now completes the XUL doc walk (`DoneWalking` → StartLayout), paints real pixels (`TilePixels` nonzero checksum → `BufferUpload` → `DrawQuad` → `EndFrame`), and the BLAST layer latches a live 1080x2209 buffer composited by SurfaceFlinger. The breakthrough fix was a double-window: Fennec's appshell created the top window at `browser.xul` AND Pale Moon's `nsBrowserContentHandler` opened a second one from the same command line — two full chrome docs wedged each other's walk. The CLH now sets `preventDefault` on Android. See the "Desktop chrome" section below.)_
 
 _Previously (2026-10-02): **androidx migration landed**: the entire Java frontend was migrated off the legacy `android.support.*` libraries onto androidx (~38 AARs fetched from Google's maven repo into `$ANDROID_HOME/extras/androidx/m2repository`, resolved by `build/autoconf/android.m4` into `ANDROIDX_EXTRA_JARS`/`ANDROIDX_EXTRA_RES_DIRS`/`ANDROIDX_EXTRA_PACKAGES`). All jars compile, and the resulting APK now needs multidex — `MOZ_ANDROID_MIN_SDK_VERSION` was bumped 15→21 so D8 auto-partitions into `classes.dex`/`classes2.dex`/`classes3.dex` (the APK assembler and package manifest were updated to carry all dex files). Verified on the emulator: BrowserApp displays, TLS handshake + cert verification work, the OpenGL compositor initializes, and no class-loading failures occur. Gradle remains make-driven; the Gradle path is still unused.)_
 
@@ -413,25 +413,40 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   ua-update.json manifest collision with mobile/android's own copies,
   desktop-exe Makefile steps on Android.
 
-**Not verified / current blocker:**
+**Verified since (2026-10-02):**
 
-- **No first paint of the chrome window.** After scripts finish, the
-  process idles with nothing latched to the BLAST SurfaceView
-  (`buffer=0x0`, `size=(0,0)`, `TransparentRegion count=0`); no
-  `EndFrame`/`NeedsPaint` activity for the chrome widget. Screen shows
-  the Java shell (URL bar) over a blank region. The tab content widget
-  (type=4) reports `needsPaint=0`, `lm=0x0` — its layer manager is
-  never created. Whether the chrome document builds its frame tree /
-  refresh driver ticks, or desktop `browser.js` startup stalls before
-  first reflow, is the next thing to instrument (the recurring
-  system_server ANR dialog also keeps overlaying the screen under
-  ndk_translation and may starve frame delivery).
-- Residual non-fatal errors: `browser-clh` contract→CID warning
-  (Fennec's `be623d20` BrowserCLH CID stays in merged
-  components.manifest while its impl is excluded — benign), the
-  `browser.startup.homepage`/`startup.homepage_welcome_url`
-  FILE_NOT_FOUND fixed by the new branding files above, a moz-icon
-  gtk warning, and a GMPInstallManager lazy-import failure.
+- **The chrome window now paints.** Instrumented root cause and fix:
+  the Fennec appshell's `JustCreateTopWindow` opened the top window at
+  `browser.xul` (doc walk #1), then PM's `nsBrowserContentHandler`
+  opened a *second* `browser.xul` window from the same command line —
+  two full chrome documents mid-walk wedged each other (the walk never
+  reached `DoneWalking`, so `pendingSheets` never drained → no layout,
+  no paint). Fix: `nsDefaultCommandLineHandler::handle` sets
+  `cmdLine.preventDefault` on Android — the appshell's window is the
+  only browser window. After the fix: `WalkDone` → `DoneWalking` →
+  StartLayout → `PaintRoot` with real display items →
+  `TilePixels 977x1667` (checksum 1078110 — non-blank pixels) →
+  `BufferUpload` → `DrawQuad` → `EndFrame` readback → the BLAST
+  SurfaceView latches a live buffer (`buffer=0x7e7b31922e50`,
+  geomBufferSize 1080x2209, composition DEVICE, visibleRegion
+  covering the full window). The white center pixel in readbacks is
+  the empty tab-content area; styled chrome presence behind the
+  persistent system_server ANR dialog is visually unconfirmed.
+- Verified post-fix PM startup depth: nsBrowserGlue's delayed-startup
+  completes far enough to run DownloadIntegration (DLStore), a live
+  blocklist fetch to blocklist.palemoon.org (real HTTPS; "Unsupported"
+  response for our version parsed), PlacesCategoriesStarter,
+  nsPlacesExpiration, FormHistory, PlacesDBUtils, Sqlite — a genuine
+  Pale Moon backend session.
+- Residual non-fatal errors to clean up: `TypeError: win is null`
+  (nsBrowserGlue.js:714 — likely a getMostRecentBrowserWindow during
+  early startup), `defaults/profile/bookmarks.html` missing so the
+  first-run bookmark import reports failure (PM's vendor profile dir
+  ships no bookmarks.html), an IndexedDB maintenance NS_ERROR, a
+  `browser-clh` contract→CID warning (Fennec's `be623d20` BrowserCLH
+  CID stays in merged components.manifest while its impl is excluded —
+  benign), a moz-icon gtk warning, and a GMPInstallManager lazy-import
+  failure.
 - Interactivity is entirely unadapted (menubar→Android, window.open,
   hover, keyboard shortcuts, toolbox layout at phone width); see
   docs/XUL-ON-ANDROID.md for the mapping assessment.

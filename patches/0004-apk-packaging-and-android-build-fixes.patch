@@ -172,6 +172,35 @@ index d4a2738293..d5bfa2ef26 100644
  utilmodt.h
  utilpars.h
  utilparst.h
+diff --git a/dom/base/nsDocument.cpp b/dom/base/nsDocument.cpp
+index 05df4a34d6..802f4b866b 100644
+--- a/dom/base/nsDocument.cpp
++++ b/dom/base/nsDocument.cpp
+@@ -7,6 +7,9 @@
+  * Base class for all our document implementations.
+  */
+ 
++#ifdef ANDROID
++#include <android/log.h>
++#endif
+ #include "nsDocument.h"
+ #include "nsIDocumentInlines.h"
+ #include "mozilla/AnimationComparator.h"
+@@ -2654,6 +2657,14 @@ nsDocument::StopDocumentLoad()
+ void
+ nsDocument::SetDocumentURI(nsIURI* aURI)
+ {
++#ifdef ANDROID
++  if (IsXULDocument()) {
++    nsAutoCString pmuri;
++    if (aURI) aURI->GetSpec(pmuri);
++    __android_log_print(ANDROID_LOG_INFO, "PMXUL",
++                        "XULDoc URI %s", pmuri.get());
++  }
++#endif
+   nsCOMPtr<nsIURI> oldBase = GetDocBaseURI();
+   mDocumentURI = NS_TryToMakeImmutable(aURI);
+   nsIURI* newBase = GetDocBaseURI();
 diff --git a/dom/plugins/base/moz.build b/dom/plugins/base/moz.build
 index 88c3d9115f..a7c68b1dd6 100644
 --- a/dom/plugins/base/moz.build
@@ -250,7 +279,7 @@ index cb9dbaad51..d8538549cf 100644
  #else
  #error Need NativeWindowHandle for this platform
 diff --git a/dom/xul/XULDocument.cpp b/dom/xul/XULDocument.cpp
-index 1c07d144b0..f1b4ef058c 100644
+index 1c07d144b0..acd2cbf298 100644
 --- a/dom/xul/XULDocument.cpp
 +++ b/dom/xul/XULDocument.cpp
 @@ -136,6 +136,13 @@ int32_t XULDocument::gRefCnt = 0;
@@ -322,7 +351,16 @@ index 1c07d144b0..f1b4ef058c 100644
      nsresult rv;
  
      // Add the style overlays from chrome registry, if any.
-@@ -2676,6 +2696,8 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
+@@ -2381,6 +2401,8 @@ XULDocument::InsertXMLStylesheetPI(const nsXULPrototypePI* aProtoPI,
+     rv = ssle->UpdateStyleSheet(this, &willNotify, &isAlternate);
+     if (NS_SUCCEEDED(rv) && willNotify && !isAlternate) {
+         ++mPendingSheets;
++        PM_XULLOG("PendingSheet++ pi n=%d rv=%x",
++                  (int)mPendingSheets, (unsigned)rv);
+     }
+ 
+     // Ignore errors from UpdateStyleSheet; we don't want failure to
+@@ -2676,6 +2698,8 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
  nsresult
  XULDocument::ResumeWalk()
  {
@@ -331,7 +369,15 @@ index 1c07d144b0..f1b4ef058c 100644
      // Walk the prototype and build the delegate content model. The
      // walk is performed in a top-down, left-to-right fashion. That
      // is, a parent is built before any of its children; a node is
-@@ -2957,6 +2979,8 @@ XULDocument::ResumeWalk()
+@@ -2948,6 +2972,7 @@ XULDocument::ResumeWalk()
+     ApplyPersistentAttributes();
+ 
+     mStillWalking = false;
++    PM_XULLOG("WalkDone pendingSheets=%d", (int)mPendingSheets);
+     if (mPendingSheets == 0) {
+         rv = DoneWalking();
+     }
+@@ -2957,6 +2982,8 @@ XULDocument::ResumeWalk()
  nsresult
  XULDocument::DoneWalking()
  {
@@ -340,7 +386,22 @@ index 1c07d144b0..f1b4ef058c 100644
      NS_PRECONDITION(mPendingSheets == 0, "there are sheets to be loaded");
      NS_PRECONDITION(!mStillWalking, "walk not done");
  
-@@ -3475,12 +3499,15 @@ XULDocument::OnScriptCompileComplete(JSScript* aScript, nsresult aStatus)
+@@ -3105,6 +3132,14 @@ XULDocument::StyleSheetLoaded(StyleSheet* aSheet,
+             "Unexpected StyleSheetLoaded notification");
+ 
+         --mPendingSheets;
++        {
++            nsAutoCString pmuri2;
++            if (aSheet && aSheet->GetSheetURI()) {
++                aSheet->GetSheetURI()->GetSpec(pmuri2);
++            }
++            PM_XULLOG("SheetLoaded n=%d status=%x uri=%s",
++                      (int)mPendingSheets, (unsigned)aStatus, pmuri2.get());
++        }
+ 
+         if (!mStillWalking && mPendingSheets == 0) {
+             return DoneWalking();
+@@ -3475,12 +3510,15 @@ XULDocument::OnScriptCompileComplete(JSScript* aScript, nsresult aStatus)
  nsresult
  XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
  {
@@ -356,7 +417,7 @@ index 1c07d144b0..f1b4ef058c 100644
      NS_ENSURE_SUCCESS(rv, rv);
  
      // Execute the precompiled script with the given version
-@@ -3495,7 +3522,11 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
+@@ -3495,7 +3533,11 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
      NS_ENSURE_TRUE(scriptObject, NS_ERROR_UNEXPECTED);
  
      JS::Rooted<JSObject*> baseGlobal(cx, JS::CurrentGlobalOrNull(cx));
@@ -369,7 +430,7 @@ index 1c07d144b0..f1b4ef058c 100644
  
      JSAddonId* addonId = mCurrentPrototype ? MapURIToAddonID(mCurrentPrototype->GetURI()) : nullptr;
      JS::Rooted<JSObject*> global(cx, xpc::GetAddonScope(cx, baseGlobal, addonId));
-@@ -3508,7 +3539,8 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
+@@ -3508,7 +3550,8 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
      // and execute it. On failure, ~AutoScriptEntry will handle exceptions, so
      // there is no need to manually check the return value.
      JS::RootedValue rval(cx);
@@ -379,6 +440,14 @@ index 1c07d144b0..f1b4ef058c 100644
  
      return NS_OK;
  }
+@@ -3729,6 +3772,7 @@ XULDocument::AddPrototypeSheets()
+         // from LoadSheet (and thus exit the loop).
+         if (NS_SUCCEEDED(rv)) {
+             ++mPendingSheets;
++            PM_XULLOG("PendingSheet++ overlay n=%d", (int)mPendingSheets);
+             if (!mOverlaySheets.AppendElement(incompleteSheet)) {
+                 return NS_ERROR_OUT_OF_MEMORY;
+             }
 diff --git a/gfx/cairo/cairo/src/moz.build b/gfx/cairo/cairo/src/moz.build
 index 34587ade8d..5d712abce2 100644
 --- a/gfx/cairo/cairo/src/moz.build

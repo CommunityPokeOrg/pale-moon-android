@@ -26,8 +26,9 @@ Fennec chrome (Java toolbar/tabs/menus + the minimal XUL deck), and
 `--enable-palemoon-desktop-chrome` builds an APK where chrome name
 `browser` resolves to the desktop `palemoon/` XUL chrome
 (`chrome://browser/content/browser.xul`). The desktop-chrome build
-loads and executes its XUL on-device — it does not yet paint (see
-STATUS.md).
+loads, executes, and **paints** its XUL on-device — `DoneWalking`
+→ layout → tiled raster → DrawQuad → EndFrame → latched BLAST
+buffer (see STATUS.md).
 
 ## Verified working (on-device)
 
@@ -67,9 +68,9 @@ STATUS.md).
 - User interaction: the emulator wedges its input dispatch under
   ndk_translation load (system_server ANRs), so taps/keys cannot be
   tested. Interactive verification needs a real arm64 device.
-- **First paint of the desktop chrome window** (desktop-chrome build):
-  `browser.xul` loads, its scripts execute, the compositor initializes,
-  but no frame ever reaches the surface — next instrumentation target.
+- First paint of the desktop chrome window verified 2026-10-02
+  (PaintRoot → tiles → DrawQuad → latched BLAST buffer; pixel content
+  unconfirmed behind the persistent system ANR dialog).
 - First paint of rendered web content in the LayerView surface was
   verified 2026-10-01 (red test page rendered on-screen).
 
@@ -107,27 +108,29 @@ Fennec Java shell for Android OS integration (intents, lifecycle,
 downloads, notifications) and load the desktop `browser.xul` chrome into
 the LayerView surface as the app's XUL window — i.e., what Fennec does
 with its minimal XUL doc, but pointing at the Pale Moon chrome and adding
-the missing widget/theme/menu glue. **2026-10-02 update: the plumbing
-half of this is now verified working.** `--enable-palemoon-desktop-chrome`
-swaps `browser.jar`+`browser.manifest`+`palemoon.js`+PM components into
-the APK; on-device the desktop chrome resolves, loads, and runs its full
-script set (browser.js + overlay scripts, InlineSpellChecker.jsm,
-sessionstore, feeds, places) with no fatal chrome/registry/prefs/XPT
-errors. The remaining gap is exactly the rendering/input half: the
-desktop chrome window does not yet paint, and menus/keyboard/hover/
-window-management remain unadapted.
+the missing widget/theme/menu glue. **2026-10-02 update: the chrome now
+paints.** `--enable-palemoon-desktop-chrome` swaps
+`browser.jar`+`browser.manifest`+`palemoon.js`+PM components into the
+APK; on-device the desktop chrome resolves, loads, runs its full script
+set, completes the XUL doc walk, and composites real pixels onto the
+surface — the fix that unblocked it was stopping PM's command-line
+handler from opening a second browser window alongside the appshell's.
+The remaining gap is adaptation, not feasibility: menus/keyboard/hover/
+window-management, the second-window paths (dialogs, window.open), and
+routing Java-side intent URLs into PM's tab model instead of Fennec's
+Tab:Load events.
 
 ## Current stance
 
 - Shipping by default: full Goanna/UXP platform + Fennec mobile chrome
   (Java UI + minimal XUL document) + New Moon branding.
 - Available via flag: desktop Pale Moon chrome that compiles, packages,
-  resolves, and executes its XUL/JS on-device; first paint of the
-  chrome window is the open blocker (may be an ordinary paint-path
-  bug rather than an architecture mismatch — the Fennec chrome's
-  content surface paints fine).
+  resolves, executes, and paints its XUL/JS on-device in the app's
+  single surface — first frame verified end-to-end through
+  SurfaceFlinger.
 - Honest bottom line: XUL itself runs fine on Android — both the Fennec
-  XUL document and the full desktop `browser.xul` chrome load, run, and
-  reach steady state. The open work is desktop-chrome first paint,
-  interactive input, and menu/window adaptation — none of which are
-  architectural blockers.
+  XUL document and the full desktop `browser.xul` chrome load, run,
+  reach steady state, and now paint. The open work is chrome
+  interaction (menus, window.open/dialogs, intent-URL routing) and
+  on-device visual verification once the emulator stops ANR-wedging —
+  none of which are architectural blockers.

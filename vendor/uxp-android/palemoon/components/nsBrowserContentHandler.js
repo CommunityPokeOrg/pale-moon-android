@@ -721,6 +721,12 @@ nsDefaultCommandLineHandler.prototype = {
   handle: function(cmdLine) {
     var urilist = [];
 
+#ifdef MOZ_WIDGET_ANDROID
+    // The Android appshell already created the single top-level browser
+    // window; never open a second one from the command line.
+    cmdLine.preventDefault = true;
+#endif
+
 #ifdef XP_WIN
     // If we don't have a profile selected yet (e.g. the Profile Manager is
     // displayed) we will crash if we open an url and then select a profile. To
