@@ -720,6 +720,12 @@ public class BrowserApp extends GeckoApp
 
         mHomeScreenContainer = (ViewGroup) findViewById(R.id.home_screen_container);
 
+        if (AppConstants.MOZ_PALEMOON_DESKTOP_CHROME) {
+            // The desktop Pale Moon XUL chrome draws its own toolbox inside
+            // the Gecko surface; keep the Fennec native chrome hidden.
+            mBrowserChrome.setVisibility(View.GONE);
+        }
+
         mBrowserSearchContainer = findViewById(R.id.search_container);
         mBrowserSearch = (BrowserSearch) getSupportFragmentManager().findFragmentByTag(BROWSER_SEARCH_TAG);
         if (mBrowserSearch == null) {
@@ -1548,7 +1554,8 @@ public class BrowserApp extends GeckoApp
         mDoorHangerPopup.setOnVisibilityChangeListener(this);
 
         mDynamicToolbar.setLayerView(mLayerView);
-        setDynamicToolbarEnabled(mDynamicToolbar.isEnabled());
+        setDynamicToolbarEnabled(AppConstants.MOZ_PALEMOON_DESKTOP_CHROME ?
+                                 false : mDynamicToolbar.isEnabled());
 
         // Intercept key events for gamepad shortcuts
         mLayerView.setOnKeyListener(this);
@@ -1693,6 +1700,11 @@ public class BrowserApp extends GeckoApp
 
     @Override
     void toggleChrome(final boolean aShow) {
+        if (AppConstants.MOZ_PALEMOON_DESKTOP_CHROME) {
+            // There is no native chrome to toggle; the desktop XUL chrome
+            // manages its own visibility.
+            return;
+        }
         ThreadUtils.postToUiThread(new Runnable() {
             @Override
             public void run() {
@@ -1709,6 +1721,11 @@ public class BrowserApp extends GeckoApp
 
     @Override
     void focusChrome() {
+        if (AppConstants.MOZ_PALEMOON_DESKTOP_CHROME) {
+            // There is no native URL bar to focus; the desktop XUL chrome
+            // owns the location bar.
+            return;
+        }
         ThreadUtils.postToUiThread(new Runnable() {
             @Override
             public void run() {
@@ -2858,6 +2875,11 @@ public class BrowserApp extends GeckoApp
     }
 
     private void showHomePagerWithAnimator(String panelId, Bundle panelRestoreData, PropertyAnimator animator) {
+        if (AppConstants.MOZ_PALEMOON_DESKTOP_CHROME) {
+            // The desktop chrome renders its own start page; never show
+            // the Fennec home pager.
+            return;
+        }
         if (isHomePagerVisible()) {
             // Home pager already visible, make sure it shows the correct panel.
             mHomeScreen.showPanel(panelId, panelRestoreData);
@@ -3392,7 +3414,9 @@ public class BrowserApp extends GeckoApp
                     }
                     mBrowserChrome.setVisibility(View.GONE);
                 } else {
-                    mBrowserChrome.setVisibility(View.VISIBLE);
+                    if (!AppConstants.MOZ_PALEMOON_DESKTOP_CHROME) {
+                        mBrowserChrome.setVisibility(View.VISIBLE);
+                    }
                     if (mDynamicToolbar.isEnabled()) {
                         mDynamicToolbar.setPinned(false, PinReason.FULL_SCREEN);
                         mDynamicToolbar.setVisible(true, VisibilityTransition.IMMEDIATE);

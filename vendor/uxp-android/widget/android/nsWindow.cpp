@@ -1361,7 +1361,15 @@ nsWindow::GeckoViewSupport::Open(const jni::Class::LocalRef& aCls,
 
     nsCOMPtr<mozIDOMWindowProxy> domWindow;
     ww->OpenWindow(nullptr, url, nullptr,
+#ifdef MOZ_PALEMOON_DESKTOP_CHROME
+                   // "all" only takes effect for dialog windows; name the
+                   // individual chrome features so the desktop toolbox shows.
+                   "chrome,dialog=0,resizable,scrollbars=yes,toolbar=yes,"
+                   "location=yes,personalbar=yes,status=yes,menubar=yes,"
+                   "extrachrome=yes",
+#else
                    "chrome,dialog=0,resizable,scrollbars=yes",
+#endif
                    nullptr, getter_AddRefs(domWindow));
     MOZ_RELEASE_ASSERT(domWindow);
 

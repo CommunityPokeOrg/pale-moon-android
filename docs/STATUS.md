@@ -483,6 +483,68 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   `native_regexp` via a profile `user.js` makes startup reliably
   reach paint (~7 min). Test-only; not shipped in the APK, and not
   needed on real arm64 hardware.
+
+**Verified since (2026-10-02, hiding the Fennec Java chrome):**
+
+- `MOZ_PALEMOON_DESKTOP_CHROME` is now exposed to Java:
+  `mobile/android/base/moz.build` adds it to the `AppConstants`
+  DEFINES list and `AppConstants.java.in` gains a preprocessed
+  `public static final boolean MOZ_PALEMOON_DESKTOP_CHROME`
+  (verified `= true` in the generated `AppConstants.java` of the
+  built APK).
+- `BrowserApp.onCreate` sets `mBrowserChrome` (the whole Fennec
+  toolbar container incl. tab strip ViewStub, URL bar flipper and
+  action mode view) to `View.GONE` under the flag, and
+  `showHomePagerWithAnimator` returns early so the Fennec home pager
+  can never cover the Gecko surface.
+- The Fennec toolbar could still re-appear: Gecko sends
+  `ToggleChrome:Focus` / `ToggleChrome:Hide|Show` observer messages
+  (window focus / popup windows without chrome), which BrowserApp
+  mapped to `mBrowserChrome.setVisibility(VISIBLE)`, and the
+  fullscreen-exit path did the same. All three re-show paths are now
+  gated under the flag — there is no native chrome to toggle or
+  focus when the desktop XUL chrome owns the window.
+- `setDynamicToolbarEnabled(false)` is forced under the flag so the
+  dynamic-toolbar animator no longer shrinks the LayerView viewport
+  to make room for a toolbar that does not exist (prevents an
+  empty band at the top of the content area).
+- The compositor's end-of-frame readback (`PMDL` tag) now samples a
+  4x4 pixel grid instead of two points, so chrome-region painting
+  can be verified without a screen (the emulator's recurring
+  system_server ANR dialog blocks the display).
+
+**Verified since (2026-10-02, desktop chrome window flags + delayed startup):**
+
+- `_delayedStartup` never ran on Android: `browser.js` `init()` waits
+  for a `MozAfterPaint` event that never fires with this compositor,
+  so `browser-delayed-startup-finished` was never sent. A 5 s
+  `setTimeout` fallback under `MOZ_WIDGET_ANDROID` now invokes
+  `_delayedStartup` directly (verified: `PMXW-DS enter/done` in
+  logcat, `delayedStartupFinished=true`).
+- With delayed startup running, a layout dump showed every toolbox
+  child (`toolbar-menubar`, `nav-bar`, `PersonalToolbar`,
+  `TabsToolbar`) at 0x0 with computed `display=none`: the window was
+  opened without chrome flags, so `chromehidden` listed every chrome
+  class and `toolkit/content/xul.css` hides them.
+- `nsWindow::GeckoViewSupport::Open` opened `browser.xul` with
+  `"chrome,dialog=0,resizable,scrollbars=yes"`. `all` is silently
+  ignored for `dialog=0` windows
+  (`nsWindowWatcher::CalculateChromeFlagsForParent` only honors it
+  when `aDialog`), so under the flag the features string now names
+  each chrome class explicitly
+  (`toolbar=yes,location=yes,personalbar=yes,status=yes,menubar=yes,extrachrome=yes`).
+  Verified: `JustCreateTopWindow ... mask=80000ffe` (full chrome
+  flags) in logcat.
+- New crash once chrome was enabled, ~2 min after OnChromeLoaded:
+  SIGSEGV (fault=0) in `nsMIMEInfoAndroid::SystemChooser::Equals` —
+  `mOuter` is a raw pointer back to its `nsMIMEInfoAndroid`, which is
+  freed while the chooser (referenced via `mHandlerApps` /
+  `GetPreferredApplicationHandler`) is still alive; the vcall on the
+  dangling outer derefs address 0. Fixed by making `mOuter` a
+  `RefPtr<nsMIMEInfoAndroid>` (bounded ref-cycle, one per MIMEInfo).
+  Verified: the same post-chrome window now survives past the crash
+  point (process still alive well after the previous ~2 min crash
+  offset).
 - Remaining known errors are harmless: IndexedDB maintenance
   NS_ERROR_NOT_AVAILABLE, browser-clh contract→CID warning (benign),
   moz-icon gtk warning, GMPInstallManager lazy-import, snippets CDN

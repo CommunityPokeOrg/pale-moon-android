@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "nsMIMEInfoAndroid.h"
 #include "AndroidBridge.h"
+#if defined(MOZ_WIDGET_ANDROID)
+#include <android/log.h>
+#endif
 #include "nsAndroidHandlerApp.h"
 #include "nsArrayUtils.h"
 #include "nsISupportsUtils.h"
@@ -28,6 +31,13 @@ nsMIMEInfoAndroid::LoadUriInternal(nsIURI * aURI)
 
   nsCString uriScheme;
   aURI->GetScheme(uriScheme);
+
+#if defined(MOZ_WIDGET_ANDROID)
+  __android_log_print(ANDROID_LOG_INFO, "PMASS",
+    "LoadUriInternal uri=%s type=%s env=%p main=%d",
+    uriSpec.get(), mType.get(), (void*)mozilla::jni::GetGeckoThreadEnv(),
+    (int)NS_IsMainThread());
+#endif
 
   nsAutoString mimeType;
   if (mType.Equals(uriScheme) || mType.Equals(uriSpec)) {

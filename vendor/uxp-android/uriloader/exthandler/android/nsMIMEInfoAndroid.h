@@ -9,6 +9,7 @@
 #include "nsMIMEInfoImpl.h"
 #include "nsIMutableArray.h"
 #include "nsAndroidHandlerApp.h"
+#include "mozilla/RefPtr.h"
 
 class nsMIMEInfoAndroid final : public nsIMIMEInfo
 {
@@ -48,12 +49,13 @@ public:
   public:
     NS_DECL_ISUPPORTS
     NS_DECL_NSIHANDLERAPP
-    SystemChooser(nsMIMEInfoAndroid* aOuter): mOuter(aOuter) {}
+    explicit SystemChooser(nsMIMEInfoAndroid* aOuter): mOuter(aOuter) {}
 
   private:
     ~SystemChooser() {}
 
-    nsMIMEInfoAndroid* mOuter;
+    // Strong ref: callers can outlive the owning nsMIMEInfoAndroid.
+    RefPtr<nsMIMEInfoAndroid> mOuter;
   };
 };
 

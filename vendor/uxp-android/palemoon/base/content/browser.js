@@ -766,6 +766,9 @@ var gBrowserInit = {
 
   onLoad: function() {
     var mustLoadSidebar = false;
+#ifdef MOZ_WIDGET_ANDROID
+    Services.console.logStringMessage("PMXW-onLoad enter");
+#endif
 
     Cc["@mozilla.org/eventlistenerservice;1"]
       .getService(Ci.nsIEventListenerService)
@@ -1000,8 +1003,57 @@ var gBrowserInit = {
     window.addEventListener("MozAfterPaint", this._boundDelayedStartup);
 
 #ifdef MOZ_WIDGET_ANDROID
-    // Java VIEW-intent/URL loads arrive as "Tab:Load" observer
-    // notifications; nsBrowserGlue routes them into gBrowser.
+    // MozAfterPaint never reaches the chrome window on Android (the
+    // compositor presents offscreen), which would leave delayedStartup
+    // waiting forever; run it on a timer instead.
+    setTimeout(() => {
+      if (this.delayedStartupFinished || !this._boundDelayedStartup) {
+        return;
+      }
+      try {
+        this._delayedStartup(mustLoadSidebar);
+      } catch(e) { Cu.reportError("PMXW-DS failed: " + e); }
+    }, 5000);
+    setTimeout(() => {
+      try {
+        let dumpBox = function(id) {
+          let el = document.getElementById(id);
+          if (!el || !el.boxObject) {
+            Services.console.logStringMessage("PMXW-Layout #" + id + " MISSING");
+            return;
+          }
+          let o = el.boxObject;
+          Services.console.logStringMessage("PMXW-Layout #" + id + " " + o.x + "," + o.y +
+            " " + o.width + "x" + o.height +
+            (el.getAttribute("collapsed") == "true" ? " COLLAPSED" : "") +
+            (el.hidden ? " HIDDEN" : ""));
+        };
+        Services.console.logStringMessage("PMXW-Layout delayedStartupFinished=" +
+          this.delayedStartupFinished);
+        Services.console.logStringMessage("PMXW-Layout chromehidden='" +
+          document.documentElement.getAttribute("chromehidden") + "'" +
+          " hidechrome='" + document.documentElement.getAttribute("hidechrome") + "'" +
+          " sizemode='" + document.documentElement.getAttribute("sizemode") + "'");
+        dumpBox("navigator-toolbox");
+        dumpBox("toolbar-menubar");
+        dumpBox("nav-bar");
+        dumpBox("PersonalToolbar");
+        dumpBox("TabsToolbar");
+        dumpBox("tabbrowser-tabs");
+        dumpBox("appcontent");
+        dumpBox("browser");
+        dumpBox("status-bar");
+        for (let id of ["navigator-toolbox", "nav-bar", "TabsToolbar"]) {
+          let el = document.getElementById(id);
+          if (el) {
+            let cs = window.getComputedStyle(el);
+            Services.console.logStringMessage("PMXW-Layout cs #" + id +
+              " display=" + cs.display + " visibility=" + cs.visibility +
+              " height=" + cs.height);
+          }
+        }
+      } catch(e) { Cu.reportError("PMXW-Layout failed: " + e); }
+    }, 20000);
 #endif
 
     this._loadHandled = true;
@@ -1014,6 +1066,9 @@ var gBrowserInit = {
 
   _delayedStartup: function(mustLoadSidebar) {
     let tmp = {};
+#ifdef MOZ_WIDGET_ANDROID
+    Services.console.logStringMessage("PMXW-DS enter");
+#endif
 
     this._cancelDelayedStartup();
 
@@ -1294,6 +1349,9 @@ var gBrowserInit = {
     });
 
     this.delayedStartupFinished = true;
+#ifdef MOZ_WIDGET_ANDROID
+    Services.console.logStringMessage("PMXW-DS done");
+#endif
 
     Services.obs.notifyObservers(window, "browser-delayed-startup-finished", "");
   },
