@@ -646,6 +646,19 @@ BrowserGlue.prototype = {
 
   // the first browser window has finished initializing
 #ifdef MOZ_WIDGET_ANDROID
+  _applyTabLoad: function(win, args) {
+    if (args.newTab) {
+      let tab = win.gBrowser.addTab(args.url, { skipAnimation: true });
+      if (args.selected !== false) {
+        win.gBrowser.selectedTab = tab;
+      }
+      Services.console.logStringMessage("PMXW-TabLoad: added " + args.url);
+    } else {
+      win.gBrowser.loadURI(args.url);
+      Services.console.logStringMessage("PMXW-TabLoad: loaded " + args.url);
+    }
+  },
+
   _onTabLoad: function(data) {
     try {
       let args = JSON.parse(data);
@@ -654,12 +667,9 @@ BrowserGlue.prototype = {
       }
       let win = Services.wm.getMostRecentWindow("navigator:browser");
       if (win && win.gBrowser) {
-        // Navigate the current tab; the desktop chrome's tab-strip
-        // machinery is not adapted to Android.
-        win.gBrowser.loadURI(args.url);
-        Services.console.logStringMessage("PMXW-TabLoad: loaded " + args.url);
+        this._applyTabLoad(win, args);
       } else {
-        this._pendingTabLoads.push(args.url);
+        this._pendingTabLoads.push(data);
         Services.console.logStringMessage("PMXW-TabLoad: buffered " + args.url);
       }
     } catch (e) {
@@ -671,13 +681,18 @@ BrowserGlue.prototype = {
     if (!this._pendingTabLoads || !this._pendingTabLoads.length) {
       return;
     }
-    let url = this._pendingTabLoads[this._pendingTabLoads.length - 1];
-    this._pendingTabLoads.length = 0;
-    try {
-      win.gBrowser.loadURI(url);
-      Services.console.logStringMessage("PMXW-TabLoad: flushed " + url);
-    } catch (e) {
-      Cu.reportError(e);
+    let pending = this._pendingTabLoads;
+    this._pendingTabLoads = [];
+    for (let data of pending) {
+      try {
+        let args = JSON.parse(data);
+        if (args.url) {
+          this._applyTabLoad(win, args);
+          Services.console.logStringMessage("PMXW-TabLoad: flushed " + args.url);
+        }
+      } catch (e) {
+        Cu.reportError(e);
+      }
     }
   },
 #endif
