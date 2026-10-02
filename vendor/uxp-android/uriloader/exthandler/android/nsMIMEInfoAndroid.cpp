@@ -423,10 +423,12 @@ const nsIID nsIHandlerApp::COMTypeInfo<nsMIMEInfoAndroid::SystemChooser, void>::
 
 nsresult
 nsMIMEInfoAndroid::SystemChooser::Equals(nsIHandlerApp *aHandlerApp, bool *aRetVal) {
-  nsCOMPtr<nsMIMEInfoAndroid::SystemChooser> info = do_QueryInterface(aHandlerApp);
-  if (info)
-    return mOuter->Equals(info->mOuter, aRetVal);
-  *aRetVal = false;
+  // The COMTypeInfo workaround above gives SystemChooser the generic
+  // nsIHandlerApp IID, so do_QueryInterface<SystemChooser> succeeds for ANY
+  // handler app (nsAndroidHandlerApp, nsLocalHandlerApp, ...) and mOuter
+  // would read garbage. A chooser is unique per MIMEInfo, so pointer
+  // identity is the only safe comparison.
+  *aRetVal = (aHandlerApp == this);
   return NS_OK;
 }
 

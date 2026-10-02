@@ -545,6 +545,28 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   Verified: the same post-chrome window now survives past the crash
   point (process still alive well after the previous ~2 min crash
   offset).
+- The RefPtr alone did not fix it: the crash recurred at the same
+  site. The real bug is the bug-986975 `COMTypeInfo` workaround —
+  `SystemChooser` is registered with the *generic* `nsIHandlerApp`
+  IID, so `do_QueryInterface<SystemChooser>(anyHandlerApp)` succeeds
+  for `nsAndroidHandlerApp`/`nsLocalHandlerApp` and `info->mOuter`
+  reads garbage at the mOuter offset. `SystemChooser::Equals` now
+  uses pointer identity (`aHandlerApp == this`): a chooser is unique
+  per MIMEInfo so identity is the only safe comparison.
+- With that, the full desktop chrome now lays out *and paints* on
+  the emulator. `PMXW-Layout` dump (2026-10-02 run):
+  `chromehidden=''`, `delayedStartupFinished=true`,
+  `#navigator-toolbox` 375x118 (menubar 25px + nav-bar 38px +
+  PersonalToolbar 31px + TabsToolbar 25px), `#appcontent`/`#browser`
+  375x501 below it, status-bar at bottom. Screenshot-verified: File/
+  Edit/View/History/Bookmarks/Tools/Help menubar, the desktop nav
+  toolbar with icons, the bookmarks toolbar (Most Visited / Pale
+  Moon / New Moon for Android), an "Example Domain" tab, the loaded
+  page content, and the status bar — the complete Pale Moon XUL
+  chrome, composited by Goanna on Android.
+- Note the wall-clock cost on this emulator: onLoad ran ~16 min
+  after launch (ndk_translation + interpreter-only JS); nothing was
+  actually hung — earlier "stall" reads were just extreme slowness.
 - Remaining known errors are harmless: IndexedDB maintenance
   NS_ERROR_NOT_AVAILABLE, browser-clh contract→CID warning (benign),
   moz-icon gtk warning, GMPInstallManager lazy-import, snippets CDN
@@ -677,14 +699,18 @@ as the app chrome on Android instead of the Fennec mobile chrome.
    javac/aapt2/D8 still does the build; `gradle/` is vestigial),
    targetSdk 23→34 (requires runtime-permission handling), and a
    stale `android.support.v4.app.Fragment` keep in proguard.cfg.
-4. ~~First paint of the desktop chrome window~~ — **done**
-   (2026-10-02): the loaded `browser.xul` issues frames end-to-end
-   (`PaintRoot` → `TilePixels` → `DrawQuad` → `EndFrame`), and VIEW
-   intents route through `nsBrowserGlue` into `gBrowser.loadURI`.
+4. ~~Desktop chrome window paint + full toolbox~~ — **done**
+   (2026-10-02): `browser.xul` issues frames end-to-end, VIEW
+   intents route through `nsBrowserGlue` into `gBrowser.loadURI`,
+   `_delayedStartup` runs (MozAfterPaint fallback), the window is
+   opened with all chrome classes enabled (`mask=80000ffe`), and
+   the complete desktop toolbox (menubar + nav-bar + bookmarks
+   toolbar + tab strip + status bar) lays out and paints on screen.
    Remaining: real tab creation (Java tab model ↔ `gBrowser`), the
    `updateCurrentBrowser` linkedBrowser race, Android-izing the
    desktop chrome's interaction model (menubar→overflow menu, no
-   hover/keyboard deps, toolbox layout at phone width), and the
-   surface-ordering question — the composited Gecko surface draws the
-   chrome but the Fennec Java UI layer still occupies the window.
+   hover/keyboard deps, toolbox layout at phone width), the
+   unidentified composited "New Moon" panel, and the
+   surface-ordering question — the composited Gecko surface draws
+   chrome on top of the window (in-window overlays covered).
 5. Release signing path + l10n/crashreporter overrides audit.
