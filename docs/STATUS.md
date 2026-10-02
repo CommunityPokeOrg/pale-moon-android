@@ -555,7 +555,11 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   per MIMEInfo so identity is the only safe comparison.
 - With that, the full desktop chrome now lays out *and paints* on
   the emulator. `PMXW-Layout` dump (2026-10-02 run):
-  `chromehidden=''`, `delayedStartupFinished=true`,
+  The gray rounded "New Moon" box seen mid-screen in earlier
+  captures is now identified: it is Android's
+  `DeprecatedTargetSdkVersionDialog` (the system warns that the app
+  targets SDK 23), not a Gecko-composited element — it disappears
+  once tapped through. `chromehidden=''`, `delayedStartupFinished=true`,
   `#navigator-toolbox` 375x118 (menubar 25px + nav-bar 38px +
   PersonalToolbar 31px + TabsToolbar 25px), `#appcontent`/`#browser`
   375x501 below it, status-bar at bottom. Screenshot-verified: File/
