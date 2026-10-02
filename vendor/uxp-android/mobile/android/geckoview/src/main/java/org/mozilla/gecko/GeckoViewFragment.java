@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko;
 
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.Log;
@@ -14,7 +14,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-public class GeckoViewFragment extends android.support.v4.app.Fragment {
+public class GeckoViewFragment extends androidx.fragment.app.Fragment {
     private static final String LOGTAG = "GeckoViewFragment";
 
     private static Parcelable state = null;

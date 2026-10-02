@@ -7,8 +7,8 @@ package org.mozilla.gecko.home.activitystream.menu;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.support.annotation.NonNull;
-import android.support.design.widget.NavigationView;
+import androidx.annotation.NonNull;
+import com.google.android.material.navigation.NavigationView;
 import android.view.MenuItem;
 import android.view.View;
 

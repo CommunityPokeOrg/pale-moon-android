@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -37,7 +37,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
 import android.provider.Browser;
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import android.util.Log;
 
 public class Tabs implements GeckoEventListener {

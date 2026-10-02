@@ -6,7 +6,7 @@
 package org.mozilla.gecko.util;
 
 import android.net.Uri;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.TextUtils;
 
 import org.mozilla.gecko.AppConstants.Versions;

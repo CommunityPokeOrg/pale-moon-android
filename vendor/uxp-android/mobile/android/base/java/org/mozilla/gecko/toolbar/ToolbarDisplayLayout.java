@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.AboutPages;
 import org.mozilla.gecko.BrowserApp;
 import org.mozilla.gecko.R;
@@ -30,7 +30,7 @@ import org.mozilla.gecko.widget.themed.ThemedTextView;
 
 import android.content.Context;
 import android.os.SystemClock;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;

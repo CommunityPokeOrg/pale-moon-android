@@ -6,7 +6,7 @@ package org.mozilla.gecko.home.activitystream.topsites;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.support.v4.view.PagerAdapter;
+import androidx.viewpager.widget.PagerAdapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;

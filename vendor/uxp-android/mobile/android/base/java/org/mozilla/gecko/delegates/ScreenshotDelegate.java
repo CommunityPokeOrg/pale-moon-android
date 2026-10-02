@@ -7,7 +7,7 @@ package org.mozilla.gecko.delegates;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
+import com.google.android.material.snackbar.Snackbar;
 import android.util.Log;
 
 import org.mozilla.gecko.AppConstants;

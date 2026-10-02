@@ -15,7 +15,7 @@ import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.Looper;
 import android.content.AsyncTaskLoader;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.lang.ref.WeakReference;
 

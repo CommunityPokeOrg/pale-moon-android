@@ -18,10 +18,10 @@ import android.content.res.Resources;
 import android.database.Cursor;
 import android.media.RingtoneManager;
 import android.net.Uri;
-import android.support.annotation.Nullable;
-import android.support.annotation.WorkerThread;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationManagerCompat;
+import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import android.util.Log;
 
 /**

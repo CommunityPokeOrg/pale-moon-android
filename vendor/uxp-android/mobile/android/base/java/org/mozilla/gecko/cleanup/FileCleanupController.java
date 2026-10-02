@@ -9,7 +9,7 @@ package org.mozilla.gecko.cleanup;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 
 import java.io.File;
 import java.util.ArrayList;

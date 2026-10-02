@@ -8,8 +8,8 @@ package org.mozilla.gecko.telemetry.stores;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.VisibleForTesting;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.VisibleForTesting;
+import androidx.annotation.WorkerThread;
 import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;

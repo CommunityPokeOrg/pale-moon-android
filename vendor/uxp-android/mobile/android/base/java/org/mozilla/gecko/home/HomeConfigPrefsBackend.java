@@ -27,9 +27,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.support.annotation.CheckResult;
-import android.support.annotation.VisibleForTesting;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.annotation.CheckResult;
+import androidx.annotation.VisibleForTesting;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.text.TextUtils;
 import android.util.Log;
 

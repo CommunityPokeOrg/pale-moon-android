@@ -30,7 +30,7 @@ import com.google.android.gms.common.GooglePlayServicesUtil;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v7.media.MediaRouter.RouteInfo;
+import androidx.mediarouter.media.MediaRouter.RouteInfo;
 import android.util.Log;
 
 /* Implementation of GeckoMediaPlayer for talking to ChromeCast devices */

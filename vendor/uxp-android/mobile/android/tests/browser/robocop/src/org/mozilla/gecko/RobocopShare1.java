@@ -5,7 +5,7 @@
 package org.mozilla.gecko;
 
 import android.os.Bundle;
-import android.support.v4.app.FragmentActivity;
+import androidx.fragment.app.FragmentActivity;
 
 public class RobocopShare1 extends FragmentActivity {
     private static Bundle sArguments;

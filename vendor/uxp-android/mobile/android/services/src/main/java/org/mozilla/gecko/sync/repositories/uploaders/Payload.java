@@ -4,7 +4,7 @@
 
 package org.mozilla.gecko.sync.repositories.uploaders;
 
-import android.support.annotation.CheckResult;
+import androidx.annotation.CheckResult;
 
 import java.util.ArrayList;
 

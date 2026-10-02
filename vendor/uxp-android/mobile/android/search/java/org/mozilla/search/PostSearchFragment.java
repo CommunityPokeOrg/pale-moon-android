@@ -8,7 +8,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.AppConstants;
 import org.mozilla.gecko.GeckoApplication;
 import org.mozilla.gecko.R;
@@ -22,7 +22,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;

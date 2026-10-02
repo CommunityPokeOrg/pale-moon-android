@@ -7,7 +7,7 @@ package org.mozilla.gecko.icons.loader;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 import android.util.Log;
 
 import org.mozilla.gecko.GeckoAppShell;

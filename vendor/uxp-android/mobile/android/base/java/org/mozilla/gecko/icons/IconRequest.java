@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons;
 
 import android.content.Context;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 
 import org.mozilla.gecko.R;
 

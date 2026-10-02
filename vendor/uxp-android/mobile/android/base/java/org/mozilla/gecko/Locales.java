@@ -13,8 +13,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.StrictMode;
-import android.support.v4.app.FragmentActivity;
-import android.support.v7.app.AppCompatActivity;
+import androidx.fragment.app.FragmentActivity;
+import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * This is a helper class to do typical locale switching operations without

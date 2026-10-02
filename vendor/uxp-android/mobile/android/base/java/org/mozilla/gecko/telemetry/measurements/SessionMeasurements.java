@@ -8,8 +8,8 @@ package org.mozilla.gecko.telemetry.measurements;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.support.annotation.UiThread;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.UiThread;
+import androidx.annotation.VisibleForTesting;
 import org.mozilla.gecko.GeckoSharedPrefs;
 
 import java.util.concurrent.TimeUnit;

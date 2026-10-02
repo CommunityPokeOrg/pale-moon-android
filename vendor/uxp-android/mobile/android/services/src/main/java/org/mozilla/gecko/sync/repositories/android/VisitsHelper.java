@@ -9,7 +9,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.RemoteException;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;

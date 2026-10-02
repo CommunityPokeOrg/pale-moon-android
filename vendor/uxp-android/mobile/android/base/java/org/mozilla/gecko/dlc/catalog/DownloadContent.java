@@ -5,10 +5,10 @@
 
 package org.mozilla.gecko.dlc.catalog;
 
-import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringDef;
+import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringDef;
 
 public class DownloadContent {
     @IntDef({STATE_NONE, STATE_SCHEDULED, STATE_DOWNLOADED, STATE_FAILED, STATE_UPDATED, STATE_DELETED})

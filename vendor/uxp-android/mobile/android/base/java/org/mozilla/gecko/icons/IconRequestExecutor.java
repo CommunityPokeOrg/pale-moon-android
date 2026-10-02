@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko.icons;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import org.mozilla.gecko.icons.loader.ContentProviderLoader;
 import org.mozilla.gecko.icons.loader.DataUriLoader;

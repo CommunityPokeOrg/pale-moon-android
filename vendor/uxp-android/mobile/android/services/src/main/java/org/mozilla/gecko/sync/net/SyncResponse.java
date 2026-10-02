@@ -4,7 +4,7 @@
 
 package org.mozilla.gecko.sync.net;
 
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import org.mozilla.gecko.sync.Utils;
 

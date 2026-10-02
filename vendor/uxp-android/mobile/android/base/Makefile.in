@@ -59,17 +59,7 @@ JAVA_BOOTCLASSPATH := \
 JAVA_BOOTCLASSPATH := $(subst $(NULL) ,:,$(strip $(JAVA_BOOTCLASSPATH)))
 
 JAVA_CLASSPATH += \
-    $(ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB) \
-    $(ANDROID_SUPPORT_V4_AAR_LIB) \
-    $(ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB) \
-    $(ANDROID_APPCOMPAT_V7_AAR_LIB) \
-    $(ANDROID_SUPPORT_VECTOR_DRAWABLE_AAR_LIB) \
-    $(ANDROID_ANIMATED_VECTOR_DRAWABLE_AAR_LIB) \
-    $(ANDROID_CARDVIEW_V7_AAR_LIB) \
-    $(ANDROID_DESIGN_AAR_LIB) \
-    $(ANDROID_RECYCLERVIEW_V7_AAR_LIB) \
-    $(ANDROID_CUSTOMTABS_AAR_LIB) \
-    $(ANDROID_PALETTE_V7_AAR_LIB) \
+    $(ANDROIDX_EXTRA_JARS) \
     $(NULL)
 
 # If native devices are enabled, add Google Play Services and some of the v7
@@ -105,16 +95,7 @@ JAVA_CLASSPATH := $(subst $(NULL) ,:,$(strip $(JAVA_CLASSPATH)))
 # Library jars that we're bundling: these are subject to Proguard before inclusion
 # into classes.dex.
 java_bundled_libs := \
-    $(ANDROID_SUPPORT_V4_AAR_LIB) \
-    $(ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB) \
-    $(ANDROID_APPCOMPAT_V7_AAR_LIB) \
-    $(ANDROID_SUPPORT_VECTOR_DRAWABLE_AAR_LIB) \
-    $(ANDROID_ANIMATED_VECTOR_DRAWABLE_AAR_LIB) \
-    $(ANDROID_CARDVIEW_V7_AAR_LIB) \
-    $(ANDROID_DESIGN_AAR_LIB) \
-    $(ANDROID_RECYCLERVIEW_V7_AAR_LIB) \
-    $(ANDROID_CUSTOMTABS_AAR_LIB) \
-    $(ANDROID_PALETTE_V7_AAR_LIB) \
+    $(ANDROIDX_EXTRA_JARS) \
     $(NULL)
 
 ifdef MOZ_NATIVE_DEVICES
@@ -241,8 +222,8 @@ classes.dex: .proguard.deps
 	$(REPORT_BUILD)
 	rm -rf dex-out
 	mkdir -p dex-out
-	$(D8) --output dex-out jars-proguarded/*.jar
-	mv dex-out/classes.dex $@
+	$(D8) --min-api $(MOZ_ANDROID_MIN_SDK_VERSION) --output dex-out jars-proguarded/*.jar
+	for f in dex-out/classes*.dex; do mv "$$f" .; done
 endif
 
 ifdef MOZ_DISABLE_PROGUARD
@@ -288,6 +269,7 @@ classycle_jar := $(topsrcdir)/mobile/android/build/classycle/classycle-1.4.1.jar
 .bundled.proguard.deps: gecko-R.jar $(proguard_config_dir)/strip-libs.cfg
 	$(REPORT_BUILD)
 	@$(TOUCH) $@
+	rm -rf bundled-jars-nodebug
 	$(JAVA) \
 		-Xmx512m -Xms128m \
 		-jar $(ANDROID_SDK_ROOT)/tools/proguard/lib/proguard.jar \
@@ -303,6 +285,7 @@ classycle_jar := $(topsrcdir)/mobile/android/build/classycle/classycle-1.4.1.jar
 .proguard.deps: .geckoview.deps .bundled.proguard.deps $(ALL_JARS) $(proguard_config_dir)/proguard.cfg
 	$(REPORT_BUILD)
 	@$(TOUCH) $@
+	rm -rf jars-proguarded
 	$(JAVA) \
 		-Xmx512m -Xms128m \
 		-jar $(ANDROID_SDK_ROOT)/tools/proguard/lib/proguard.jar \
@@ -317,14 +300,14 @@ ANNOTATION_PROCESSOR_JAR_FILES := $(DEPTH)/build/annotationProcessors/annotation
 # This annotation processing step also generates
 # GeneratedJNIWrappers.h and GeneratedJNINatives.h
 GeneratedJNIWrappers.cpp: $(ANNOTATION_PROCESSOR_JAR_FILES) $(GECKOVIEW_JARS)
-	$(JAVA) -classpath $(geckoview_jars_classpath):$(JAVA_BOOTCLASSPATH):$(JAVA_CLASSPATH):$(ANNOTATION_PROCESSOR_JAR_FILES) \
+	$(JAVA) -classpath $(geckoview_jars_classpath):$(subst $(NULL) ,:,$(strip @ANDROIDX_EXTRA_JARS@)):$(JAVA_BOOTCLASSPATH):$(JAVA_CLASSPATH):$(ANNOTATION_PROCESSOR_JAR_FILES) \
 		org.mozilla.gecko.annotationProcessors.AnnotationProcessor \
 		Generated $(GECKOVIEW_JARS)
 
 # This annotation processing step also generates
 # FennecJNIWrappers.h and FennecJNINatives.h
 FennecJNIWrappers.cpp: $(ANNOTATION_PROCESSOR_JAR_FILES) $(FENNEC_JARS)
-	$(JAVA) -classpath $(all_jars_classpath):$(JAVA_BOOTCLASSPATH):$(JAVA_CLASSPATH):$(ANNOTATION_PROCESSOR_JAR_FILES) \
+	$(JAVA) -classpath $(all_jars_classpath):$(subst $(NULL) ,:,$(strip @ANDROIDX_EXTRA_JARS@)):$(JAVA_BOOTCLASSPATH):$(JAVA_CLASSPATH):$(ANNOTATION_PROCESSOR_JAR_FILES) \
 		org.mozilla.gecko.annotationProcessors.AnnotationProcessor \
 		Fennec $(FENNEC_JARS)
 
@@ -409,32 +392,12 @@ all_resources = \
 
 generated/org/mozilla/gecko/R.java: .aapt.deps ;
 
-# Only add libraries that contain resources here. We (unecessarily) generate an identical R.java which
-# is copied into each of these locations, and each of these files contains thousands of fields.
-# Each unnecessary copy therefore wastes unnecessary fields in the output dex file.
-# Note: usually proguard will help clean this up after the fact, but having too many fields will cause
-# dexing to fail, regardless of any later optimisations proguard could later make to bring us back
-# under the limit.
-# Ideally we would fix our aapt invocations to correctly generate minimal copies of R.java for each
-# package, but that seems redundant since gradle builds are able to correctly generate these files.
-
-# If native devices are enabled, add Google Play Services, build their resources
-# (no resources) generated/android/support/v4/R.java: .aapt.deps ;
-generated/android/support/v7/appcompat/R.java: .aapt.deps ;
-# (no resources) generated/android/support/graphics/drawable/animated/R.java: .aapt.deps ;
-# (no resources) generated/android/support/graphics/drawable/R.java: .aapt.deps ;
-generated/android/support/v7/cardview/R.java: .aapt.deps ;
-generated/android/support/design/R.java: .aapt.deps ;
-generated/android/support/v7/mediarouter/R.java: .aapt.deps ;
-generated/android/support/v7/recyclerview/R.java: .aapt.deps ;
-# (no resources) generated/android/support/customtabs/R.java: .aapt.deps ;
-# (no resources) generated/android/support/v7/palette/R.java: .aapt.deps ;
-generated/com/google/android/gms/R.java: .aapt.deps ;
-generated/com/google/android/gms/ads/R.java: .aapt.deps ;
-generated/com/google/android/gms/base/R.java: .aapt.deps ;
-generated/com/google/android/gms/cast/R.java: .aapt.deps ;
-# (no resources) generated/com/google/android/gms/gcm/R.java: .aapt.deps ;
-# (no resources) generated/com/google/android/gms/measurement/R.java: .aapt.deps ;
+# aapt generates a full R.java into generated/ for every package in
+# ANDROID_EXTRA_PACKAGES (see the --extra-packages flag below).  This
+# pattern rule ties any generated R.java the frontend's java_jar
+# generated_sources reference to the single .aapt.deps invocation that
+# produces them.
+generated/%/R.java: .aapt.deps ;
 
 gecko.ap_: .aapt.deps ;
 R.txt: .aapt.deps ;
@@ -585,7 +548,7 @@ libs:: FennecJNIWrappers.cpp
 endif
 
 libs:: classes.dex
-	$(INSTALL) classes.dex $(FINAL_TARGET)
+	$(INSTALL) classes*.dex $(FINAL_TARGET)
 
 # Generate Java binder interfaces from AIDL files.
 aidl_src_path := $(srcdir)/aidl

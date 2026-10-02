@@ -4,7 +4,7 @@
 
 package org.mozilla.gecko.icons.decoders;
 
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 
 import org.mozilla.gecko.annotation.RobocopTarget;
 

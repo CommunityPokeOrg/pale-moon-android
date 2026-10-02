@@ -7,9 +7,9 @@ package org.mozilla.gecko.delegates;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.support.annotation.CallSuper;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.CallSuper;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.core.content.ContextCompat;
 
 import org.mozilla.gecko.AboutPages;
 import org.mozilla.gecko.BrowserApp;

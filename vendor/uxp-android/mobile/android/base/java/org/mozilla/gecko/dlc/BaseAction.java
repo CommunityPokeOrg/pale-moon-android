@@ -6,7 +6,7 @@
 package org.mozilla.gecko.dlc;
 
 import android.content.Context;
-import android.support.annotation.IntDef;
+import androidx.annotation.IntDef;
 import android.util.Log;
 
 import org.mozilla.gecko.AppConstants;

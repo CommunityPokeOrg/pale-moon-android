@@ -8,7 +8,7 @@ package org.mozilla.gecko.restrictions;
 import org.mozilla.gecko.R;
 
 import android.content.Context;
-import android.support.annotation.StringRes;
+import androidx.annotation.StringRes;
 
 /**
  * This is a list of things we can restrict you from doing. Some of these are reflected in Android UserManager constants.

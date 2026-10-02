@@ -16,7 +16,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.graphics.Typeface;
-import android.support.v4.app.NotificationCompat;
+import androidx.core.app.NotificationCompat;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;

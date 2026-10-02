@@ -6,7 +6,7 @@
 
 package org.mozilla.gecko.widget.themed;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.GeckoApplication;
 import org.mozilla.gecko.lwt.LightweightTheme;
 import org.mozilla.gecko.R;

@@ -5,8 +5,8 @@
 
 package org.mozilla.gecko.feeds.knownsites;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * A site we know and for which we can guess the feed URL from an arbitrary URL.

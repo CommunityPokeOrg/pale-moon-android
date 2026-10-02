@@ -96,7 +96,7 @@ INNER_FENNEC_PACKAGE = \
     --inputs \
       $(GECKO_APP_AP_PATH)/gecko-nodeps.ap_ \
     --omnijar $(STAGEPATH)$(MOZ_PKG_DIR)/$(OMNIJAR_NAME) \
-    --classes-dex $(GECKO_APP_AP_PATH)/classes.dex \
+    --classes-dex $(sort $(wildcard $(GECKO_APP_AP_PATH)/classes*.dex)) \
     --lib-dirs $(STAGEPATH)$(MOZ_PKG_DIR)/lib \
     --assets-dirs $(STAGEPATH)$(MOZ_PKG_DIR)/assets \
     --features-dirs $(STAGEPATH)$(MOZ_PKG_DIR)/features \

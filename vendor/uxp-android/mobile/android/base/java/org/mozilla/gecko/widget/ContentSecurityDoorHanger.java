@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko.widget;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;

@@ -9,7 +9,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.support.annotation.CallSuper;
+import androidx.annotation.CallSuper;
 import android.util.Log;
 
 import com.keepsafe.switchboard.SwitchBoard;

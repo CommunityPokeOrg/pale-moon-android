@@ -4,8 +4,8 @@
 
 package org.mozilla.gecko.tests;
 
-import android.support.design.widget.NavigationView;
-import android.support.v4.app.Fragment;
+import com.google.android.material.navigation.NavigationView;
+import androidx.fragment.app.Fragment;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;

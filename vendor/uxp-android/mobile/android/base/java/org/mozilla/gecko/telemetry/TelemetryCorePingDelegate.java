@@ -8,8 +8,8 @@ package org.mozilla.gecko.telemetry;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.support.annotation.Nullable;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 import android.util.Log;
 import org.mozilla.gecko.BrowserApp;
 import org.mozilla.gecko.GeckoProfile;

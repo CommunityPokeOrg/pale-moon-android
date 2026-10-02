@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko.icons.loader;
 
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import org.mozilla.gecko.icons.IconRequest;
 import org.mozilla.gecko.icons.IconResponse;

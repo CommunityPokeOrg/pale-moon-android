@@ -8,8 +8,8 @@ package org.mozilla.gecko;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.customtabs.CustomTabsIntent;
+import androidx.annotation.NonNull;
+import androidx.browser.customtabs.CustomTabsIntent;
 
 import org.mozilla.gecko.customtabs.CustomTabsActivity;
 import org.mozilla.gecko.db.BrowserContract;

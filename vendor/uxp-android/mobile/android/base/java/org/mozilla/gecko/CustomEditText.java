@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.widget.themed.ThemedEditText;
 
 import android.content.Context;

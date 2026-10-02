@@ -6,9 +6,9 @@
 package org.mozilla.gecko.dlc.catalog;
 
 import android.content.Context;
-import android.support.annotation.Nullable;
-import android.support.v4.util.ArrayMap;
-import android.support.v4.util.AtomicFile;
+import androidx.annotation.Nullable;
+import androidx.collection.ArrayMap;
+import androidx.core.util.AtomicFile;
 import android.util.Log;
 
 import org.json.JSONArray;

@@ -17,9 +17,10 @@ MOZ_BRANDING_DIRECTORY=mobile/android/branding/newmoon
 MOZ_OFFICIAL_BRANDING_DIRECTORY=mobile/android/branding/official
 # MOZ_APP_DISPLAYNAME is set by branding/configure.sh
 
-# We support Android SDK version 15 and up by default.
-# See the --enable-android-min-sdk and --enable-android-max-sdk arguments in configure.in.
-MOZ_ANDROID_MIN_SDK_VERSION=15
+# We support Android SDK version 21 and up: the NDK toolchain target is
+# aarch64-linux-android21 and multidex packaging requires minSdk 21 for
+# D8's automatic main-dex partitioning.
+MOZ_ANDROID_MIN_SDK_VERSION=21
 
 # There are several entry points into the Firefox application.  These are the names of some of the classes that are
 # listed in the Android manifest.  They are specified in here to avoid hard-coding them in source code files.

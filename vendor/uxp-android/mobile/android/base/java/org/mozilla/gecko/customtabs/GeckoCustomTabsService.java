@@ -7,8 +7,8 @@ package org.mozilla.gecko.customtabs;
 
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.customtabs.CustomTabsService;
-import android.support.customtabs.CustomTabsSessionToken;
+import androidx.browser.customtabs.CustomTabsService;
+import androidx.browser.customtabs.CustomTabsSessionToken;
 import android.util.Log;
 
 import org.mozilla.gecko.GeckoProfile;
@@ -61,5 +61,26 @@ public class GeckoCustomTabsService extends CustomTabsService {
         Log.v(LOGTAG, "extraCommand()");
 
         return null;
+    }
+
+    @Override
+    protected boolean requestPostMessageChannel(CustomTabsSessionToken sessionToken, Uri uri) {
+        Log.v(LOGTAG, "requestPostMessageChannel()");
+
+        return false;
+    }
+
+    @Override
+    protected int postMessage(CustomTabsSessionToken sessionToken, String message, Bundle bundle) {
+        Log.v(LOGTAG, "postMessage()");
+
+        return RESULT_FAILURE_DISALLOWED;
+    }
+
+    @Override
+    protected boolean validateRelationship(CustomTabsSessionToken sessionToken, int relation, Uri uri, Bundle bundle) {
+        Log.v(LOGTAG, "validateRelationship()");
+
+        return false;
     }
 }

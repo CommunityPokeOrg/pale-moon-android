@@ -21,7 +21,7 @@ package org.mozilla.gecko.home;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.support.v4.content.AsyncTaskLoader;
+import androidx.loader.content.AsyncTaskLoader;
 
 import org.mozilla.gecko.GeckoApplication;
 

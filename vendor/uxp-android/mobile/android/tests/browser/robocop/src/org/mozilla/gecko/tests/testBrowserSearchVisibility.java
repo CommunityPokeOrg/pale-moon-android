@@ -4,7 +4,7 @@
 
 package org.mozilla.gecko.tests;
 
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.view.KeyEvent;
 import android.view.View;
 

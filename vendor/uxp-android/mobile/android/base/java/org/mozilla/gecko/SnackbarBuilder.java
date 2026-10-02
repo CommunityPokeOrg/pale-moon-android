@@ -12,9 +12,9 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.InsetDrawable;
-import android.support.annotation.StringRes;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.StringRes;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.core.content.ContextCompat;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
@@ -213,7 +213,7 @@ public class SnackbarBuilder {
 
             paddedIcon.setBounds(0, 0, leftPadding + icon.getIntrinsicWidth(), icon.getIntrinsicHeight());
 
-            TextView textView = (TextView) snackbar.getView().findViewById(android.support.design.R.id.snackbar_text);
+            TextView textView = (TextView) snackbar.getView().findViewById(com.google.android.material.R.id.snackbar_text);
             textView.setCompoundDrawables(paddedIcon, null, null, null);
         }
 

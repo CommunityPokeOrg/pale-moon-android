@@ -24,7 +24,7 @@ from mozpack.mozjar import JarReader
 import mozpack.path as mozpath
 
 
-def package_fennec_apk(inputs=[], omni_ja=None, classes_dex=None,
+def package_fennec_apk(inputs=[], omni_ja=None, classes_dex=[],
                        lib_dirs=[],
                        assets_dirs=[],
                        features_dirs=[],
@@ -103,8 +103,8 @@ def package_fennec_apk(inputs=[], omni_ja=None, classes_dex=None,
     if omni_ja:
         add(mozpath.join('assets', 'omni.ja'), File(omni_ja), compress=False)
 
-    if classes_dex:
-        add('classes.dex', File(classes_dex))
+    for classes_dex_file in classes_dex:
+        add(os.path.basename(classes_dex_file), File(classes_dex_file))
 
     return jarrer
 
@@ -119,8 +119,8 @@ def main(args):
                         help='Output APK file.')
     parser.add_argument('--omnijar', default=None,
                         help='Optional omni.ja to pack into APK file.')
-    parser.add_argument('--classes-dex', default=None,
-                        help='Optional classes.dex to pack into APK file.')
+    parser.add_argument('--classes-dex', nargs='*', default=[],
+                        help='Optional classes*.dex files to pack into APK file.')
     parser.add_argument('--lib-dirs', nargs='*', default=[],
                         help='Optional lib/ dirs to pack into APK file.')
     parser.add_argument('--assets-dirs', nargs='*', default=[],

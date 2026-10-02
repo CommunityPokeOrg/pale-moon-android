@@ -3,7 +3,7 @@
 
 package org.mozilla.gecko.sync.repositories.uploaders;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import static org.junit.Assert.*;
 

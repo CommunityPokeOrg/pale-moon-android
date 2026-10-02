@@ -279,30 +279,87 @@ case "$target" in
     AC_SUBST(ANDROID_TOOLS)
     AC_SUBST(ANDROID_BUILD_TOOLS_VERSION)
 
-    dnl Legacy Fennec required the (obsolete) Android Support Library AARs
-    dnl from $SDK/extras; modern packaging resolves dependencies through
-    dnl Gradle instead. Only require them when explicitly asked.
+    dnl The frontend builds against androidx artifacts fetched by
+    dnl scripts/fetch-androidx.sh into a maven-layout repo at
+    dnl $SDK/extras/androidx/m2repository.  Arg 3 non-empty requires them.
     ifelse([$3], , , [
-    MOZ_ANDROID_AAR(customtabs, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(appcompat-v7, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(support-vector-drawable, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(animated-vector-drawable, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(cardview-v7, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(design, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(recyclerview-v7, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-    MOZ_ANDROID_AAR(support-v4, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support, REQUIRED_INTERNAL_IMPL)
-    MOZ_ANDROID_AAR(palette-v7, $ANDROID_SUPPORT_LIBRARY_VERSION, android, com/android/support)
-
-    ANDROID_SUPPORT_ANNOTATIONS_JAR="$ANDROID_SDK_ROOT/extras/android/m2repository/com/android/support/support-annotations/$ANDROID_SUPPORT_LIBRARY_VERSION/support-annotations-$ANDROID_SUPPORT_LIBRARY_VERSION.jar"
-    AC_MSG_CHECKING([for support-annotations JAR])
-    if ! test -e $ANDROID_SUPPORT_ANNOTATIONS_JAR ; then
-        AC_MSG_ERROR([You must download the support-annotations lib.])
+    ANDROIDX_REPO="$ANDROID_SDK_ROOT/extras/androidx/m2repository"
+    AC_MSG_CHECKING([for androidx repository])
+    if ! test -d "$ANDROIDX_REPO" ; then
+        AC_MSG_ERROR([androidx repository not found at $ANDROIDX_REPO. Run scripts/fetch-androidx.sh with ANDROID_HOME set.])
     fi
-    AC_MSG_RESULT([$ANDROID_SUPPORT_ANNOTATIONS_JAR])
+    AC_MSG_RESULT([$ANDROIDX_REPO])
+
+    ANDROIDX_EXTRA_JARS=
+    ANDROIDX_EXTRA_RES_DIRS=
+    ANDROIDX_EXTRA_PACKAGES=
+    for ax_spec in \
+        androidx.annotation:annotation:1.1.0:jar \
+        androidx.collection:collection:1.1.0:jar \
+        androidx.core:core:1.2.0:aar \
+        androidx.arch.core:core-common:2.1.0:jar \
+        androidx.arch.core:core-runtime:2.1.0:aar \
+        androidx.lifecycle:lifecycle-common:2.1.0:jar \
+        androidx.lifecycle:lifecycle-runtime:2.1.0:aar \
+        androidx.lifecycle:lifecycle-livedata-core:2.1.0:aar \
+        androidx.lifecycle:lifecycle-viewmodel:2.1.0:aar \
+        androidx.versionedparcelable:versionedparcelable:1.1.0:aar \
+        androidx.activity:activity:1.0.0:aar \
+        androidx.fragment:fragment:1.1.0:aar \
+        androidx.savedstate:savedstate:1.0.0:aar \
+        androidx.loader:loader:1.0.0:aar \
+        androidx.customview:customview:1.1.0:aar \
+        androidx.viewpager:viewpager:1.0.0:aar \
+        androidx.viewpager2:viewpager2:1.0.0:aar \
+        androidx.drawerlayout:drawerlayout:1.1.0:aar \
+        androidx.swiperefreshlayout:swiperefreshlayout:1.0.0:aar \
+        androidx.cursoradapter:cursoradapter:1.0.0:aar \
+        androidx.interpolator:interpolator:1.0.0:aar \
+        androidx.coordinatorlayout:coordinatorlayout:1.1.0:aar \
+        androidx.localbroadcastmanager:localbroadcastmanager:1.0.0:aar \
+        androidx.legacy:legacy-support-core-utils:1.0.0:aar \
+        androidx.appcompat:appcompat:1.1.0:aar \
+        androidx.appcompat:appcompat-resources:1.1.0:aar \
+        androidx.vectordrawable:vectordrawable:1.1.0:aar \
+        androidx.vectordrawable:vectordrawable-animated:1.1.0:aar \
+        androidx.recyclerview:recyclerview:1.1.0:aar \
+        androidx.cardview:cardview:1.0.0:aar \
+        androidx.transition:transition:1.2.0:aar \
+        androidx.browser:browser:1.0.0:aar \
+        androidx.palette:palette:1.0.0:aar \
+        androidx.mediarouter:mediarouter:1.0.0:aar \
+        androidx.media:media:1.1.0:aar \
+        com.google.android.material:material:1.1.0:aar \
+    ; do
+        ax_group=${ax_spec%%:*}; ax_rest=${ax_spec#*:}
+        ax_name=${ax_rest%%:*}; ax_rest=${ax_rest#*:}
+        ax_version=${ax_rest%%:*}; ax_type=${ax_rest##*:}
+        ax_path=`echo "$ax_group" | tr . /`/$ax_name/$ax_version/$ax_name-$ax_version.$ax_type
+        ax_file="$ANDROIDX_REPO/$ax_path"
+        AC_MSG_CHECKING([for $ax_name $ax_version])
+        if ! test -e "$ax_file" ; then
+            AC_MSG_ERROR([missing androidx artifact $ax_file. Run scripts/fetch-androidx.sh with ANDROID_HOME set.])
+        fi
+        AC_MSG_RESULT([$ax_file])
+        if test "$ax_type" = "jar" ; then
+            ANDROIDX_EXTRA_JARS="$ANDROIDX_EXTRA_JARS $ax_file"
+        else
+            if ! $PYTHON -m mozbuild.action.explode_aar --destdir="$MOZ_BUILD_ROOT/dist/exploded-aar" "$ax_file" ; then
+                AC_MSG_ERROR([could not explode $ax_file])
+            fi
+            ax_root="$MOZ_BUILD_ROOT/dist/exploded-aar/$ax_name-$ax_version"
+            ANDROIDX_EXTRA_JARS="$ANDROIDX_EXTRA_JARS $ax_root/$ax_name-$ax_version-classes.jar"
+            if test -d "$ax_root/res" ; then
+                ANDROIDX_EXTRA_RES_DIRS="$ANDROIDX_EXTRA_RES_DIRS $ax_root/res"
+                ax_pkg=`grep -m1 'package="' "$ax_root/AndroidManifest.xml" | cut -d'"' -f2`
+                ANDROIDX_EXTRA_PACKAGES="$ANDROIDX_EXTRA_PACKAGES $ax_pkg"
+            fi
+        fi
+    done
     ])
-    AC_SUBST(ANDROID_SUPPORT_ANNOTATIONS_JAR)
-    ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB=$ANDROID_SUPPORT_ANNOTATIONS_JAR
-    AC_SUBST(ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB)
+    AC_SUBST(ANDROIDX_EXTRA_JARS)
+    AC_SUBST(ANDROIDX_EXTRA_RES_DIRS)
+    AC_SUBST(ANDROIDX_EXTRA_PACKAGES)
     ;;
 esac
 

@@ -8,9 +8,9 @@ import android.content.Context;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.support.annotation.DrawableRes;
-import android.support.annotation.NonNull;
-import android.support.v7.widget.AppCompatDrawableManager;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.appcompat.widget.AppCompatDrawableManager;
 import android.text.TextUtils;
 import android.util.Log;
 

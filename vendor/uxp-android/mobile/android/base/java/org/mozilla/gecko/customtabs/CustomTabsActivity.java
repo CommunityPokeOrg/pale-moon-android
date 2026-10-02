@@ -8,8 +8,8 @@ package org.mozilla.gecko.customtabs;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v7.app.ActionBar;
-import android.support.v7.widget.Toolbar;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
@@ -31,7 +31,7 @@ import org.mozilla.gecko.util.ThreadUtils;
 
 import java.lang.reflect.Field;
 
-import static android.support.customtabs.CustomTabsIntent.EXTRA_TOOLBAR_COLOR;
+import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_TOOLBAR_COLOR;
 
 public class CustomTabsActivity extends GeckoApp implements Tabs.OnTabsChangedListener {
     private static final String LOGTAG = "CustomTabsActivity";

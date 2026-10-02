@@ -16,7 +16,7 @@ import android.content.Context;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.database.Cursor;
-import android.support.design.widget.Snackbar;
+import com.google.android.material.snackbar.Snackbar;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;

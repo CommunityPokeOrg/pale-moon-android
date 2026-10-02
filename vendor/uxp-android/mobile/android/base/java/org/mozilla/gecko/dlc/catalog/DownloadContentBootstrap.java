@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko.dlc.catalog;
 
-import android.support.v4.util.ArrayMap;
+import androidx.collection.ArrayMap;
 
 import org.mozilla.gecko.AppConstants;
 

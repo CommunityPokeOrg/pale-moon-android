@@ -21,7 +21,7 @@ import com.google.android.gms.common.api.Status;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.support.v7.media.MediaRouter.RouteInfo;
+import androidx.mediarouter.media.MediaRouter.RouteInfo;
 import android.util.Log;
 
 public class ChromeCastDisplay implements GeckoPresentationDisplay {

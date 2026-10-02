@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons.storage;
 
 import android.graphics.Bitmap;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.Log;
 import android.util.LruCache;
 

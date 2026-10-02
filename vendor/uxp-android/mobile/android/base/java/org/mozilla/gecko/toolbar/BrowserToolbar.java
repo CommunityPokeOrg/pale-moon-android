@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-import android.support.annotation.Nullable;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.AppConstants.Versions;
 import org.mozilla.gecko.BrowserApp;
 import org.mozilla.gecko.GeckoAppShell;
@@ -59,7 +59,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 /**
 * {@code BrowserToolbar} is single entry point for users of the toolbar

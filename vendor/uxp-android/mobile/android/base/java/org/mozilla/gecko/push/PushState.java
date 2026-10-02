@@ -6,9 +6,9 @@
 package org.mozilla.gecko.push;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.WorkerThread;
-import android.support.v4.util.AtomicFile;
+import androidx.annotation.NonNull;
+import androidx.annotation.WorkerThread;
+import androidx.core.util.AtomicFile;
 import android.util.Log;
 
 import org.json.JSONException;

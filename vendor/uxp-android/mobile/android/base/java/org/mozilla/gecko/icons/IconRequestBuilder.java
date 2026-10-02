@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons;
 
 import android.content.Context;
-import android.support.annotation.CheckResult;
+import androidx.annotation.CheckResult;
 
 import org.mozilla.gecko.GeckoAppShell;
 

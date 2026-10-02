@@ -1,6 +1,6 @@
 package org.mozilla.gecko.feeds.knownsites;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

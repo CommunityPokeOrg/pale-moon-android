@@ -18,7 +18,7 @@ import org.mozilla.gecko.tests.UITestContext;
 import org.mozilla.gecko.tests.helpers.WaitHelper;
 
 import android.os.Build;
-import android.support.v4.view.ViewPager;
+import androidx.viewpager.widget.ViewPager;
 import android.view.View;
 import android.widget.TextView;
 

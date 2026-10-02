@@ -8,7 +8,7 @@ package org.mozilla.gecko.db;
 import org.mozilla.gecko.AppConstants;
 
 import android.net.Uri;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import org.mozilla.gecko.annotation.RobocopTarget;
 

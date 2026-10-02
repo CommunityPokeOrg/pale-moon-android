@@ -5,7 +5,7 @@
 package org.mozilla.gecko.widget;
 
 import android.content.Context;
-import android.support.v7.widget.CardView;
+import androidx.cardview.widget.CardView;
 import android.util.AttributeSet;
 
 import org.mozilla.gecko.AppConstants;

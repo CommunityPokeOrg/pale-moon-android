@@ -5,8 +5,8 @@
 
 package org.mozilla.gecko.push;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.mozilla.gecko.push.RegisterUserAgentResponse;
 import org.mozilla.gecko.push.SubscribeChannelResponse;

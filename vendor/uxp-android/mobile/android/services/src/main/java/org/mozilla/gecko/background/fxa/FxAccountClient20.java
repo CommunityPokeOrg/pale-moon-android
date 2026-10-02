@@ -4,7 +4,7 @@
 
 package org.mozilla.gecko.background.fxa;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;

@@ -14,6 +14,10 @@ geckoview_source_dir = TOPSRCDIR + '/mobile/android/geckoview/src/main/'
 geckoview_thirdparty_source_dir = TOPSRCDIR + '/mobile/android/geckoview/src/thirdparty/'
 thirdparty_source_dir = TOPSRCDIR + '/mobile/android/thirdparty/'
 
+androidx_jars = CONFIG['ANDROIDX_EXTRA_JARS'].split() if CONFIG['ANDROIDX_EXTRA_JARS'] else []
+androidx_res_dirs = CONFIG['ANDROIDX_EXTRA_RES_DIRS'].split() if CONFIG['ANDROIDX_EXTRA_RES_DIRS'] else []
+androidx_packages = CONFIG['ANDROIDX_EXTRA_PACKAGES'].split() if CONFIG['ANDROIDX_EXTRA_PACKAGES'] else []
+
 constants_jar = add_java_jar('constants')
 constants_jar.sources += [geckoview_source_dir + 'java/org/mozilla/gecko/' + x for x in [
     'annotation/JNITarget.java',
@@ -35,10 +39,6 @@ constants_jar.generated_sources = [
     'preprocessed/org/mozilla/gecko/AppConstants.java',
 ]
 constants_jar.extra_jars = [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
-    CONFIG['ANDROID_APPCOMPAT_V7_AAR_LIB'],
 ]
 
 if CONFIG['MOZ_INSTALL_TRACKING']:
@@ -59,42 +59,12 @@ resjar.generated_sources += [
     'org/mozilla/gecko/R.java',
 ]
 
-if CONFIG['ANDROID_SUPPORT_V4_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.v4']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_SUPPORT_V4_AAR_RES']]
-# (no resources) resjar.generated_sources += ['android/support/v4/R.java']
-if CONFIG['ANDROID_APPCOMPAT_V7_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.v7.appcompat']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_APPCOMPAT_V7_AAR_RES']]
-    resjar.generated_sources += ['android/support/v7/appcompat/R.java']
-if CONFIG['ANDROID_SUPPORT_VECTOR_DRAWABLE_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.graphics.drawable']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_SUPPORT_VECTOR_DRAWABLE_AAR_RES']]
-# (no reosurces) resjar.generated_sources += ['android/support/graphics/drawable/R.java']
-if CONFIG['ANDROID_ANIMATED_VECTOR_DRAWABLE_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.graphics.drawable.animated']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_ANIMATED_VECTOR_DRAWABLE_AAR_RES']]
-# (no resources) resjar.generated_sources += ['android/support/graphics/drawable/animated/R.java']
-if CONFIG['ANDROID_CARDVIEW_V7_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.v7.cardview']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_CARDVIEW_V7_AAR_RES']]
-    resjar.generated_sources += ['android/support/v7/cardview/R.java']
-if CONFIG['ANDROID_DESIGN_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.design']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_DESIGN_AAR_RES']]
-    resjar.generated_sources += ['android/support/design/R.java']
-if CONFIG['ANDROID_RECYCLERVIEW_V7_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.v7.recyclerview']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_RECYCLERVIEW_V7_AAR_RES']]
-    resjar.generated_sources += ['android/support/v7/recyclerview/R.java']
-if CONFIG['ANDROID_CUSTOMTABS_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.customtabs']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_CUSTOMTABS_AAR_RES']]
-# (no resources) resjar.generated_sources += ['android/support/customtabs/R.java']
-if CONFIG['ANDROID_PALETTE_V7_AAR']:
-    ANDROID_EXTRA_PACKAGES += ['android.support.v7.palette']
-    ANDROID_EXTRA_RES_DIRS += ['%' + CONFIG['ANDROID_PALETTE_V7_AAR_RES']]
-# (no resources) resjar.generated_sources += ['android/support/v7/palette/R.java']
+if androidx_packages:
+    ANDROID_EXTRA_PACKAGES += sorted(androidx_packages)
+if androidx_res_dirs:
+    ANDROID_EXTRA_RES_DIRS += sorted('%' + d for d in androidx_res_dirs)
+resjar.generated_sources += sorted(pkg.replace('.', '/') + '/R.java'
+                             for pkg in androidx_packages)
 
 resjar.javac_flags += ['-Xlint:all']
 
@@ -110,7 +80,6 @@ mgjar.sources += [geckoview_source_dir + 'java/org/mozilla/gecko/' + x for x in 
 ]]
 mgjar.generated_sources = [] # Keep it this way.
 mgjar.extra_jars += [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
     'constants.jar',
 ]
 mgjar.javac_flags += ['-Xlint:all']
@@ -159,9 +128,6 @@ gujar.sources += [geckoview_source_dir + 'java/org/mozilla/gecko/' + x for x in 
     'util/WindowUtils.java',
 ]]
 gujar.extra_jars = [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
     'constants.jar',
     'gecko-mozglue.jar',
 ]
@@ -174,10 +140,6 @@ stjar.javac_flags = ['-Xlint:none']
 services_jar = add_java_jar('services')
 services_jar.sources += sync_java_files
 services_jar.extra_jars = [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
-    CONFIG['ANDROID_APPCOMPAT_V7_AAR_LIB'],
     'constants.jar',
     'gecko-R.jar',
     'gecko-mozglue.jar',
@@ -214,6 +176,7 @@ if CONFIG['MOZ_WEBRTC']:
         'gecko-util.jar',
         'gecko-view.jar',
     ]
+    wrjar.extra_jars += androidx_jars
     wrjar.javac_flags += ['-Xlint:all,-deprecation,-cast']
 
 gvjar = add_java_jar('gecko-view')
@@ -290,9 +253,6 @@ gvjar.sources += [geckoview_thirdparty_source_dir + f for f in [
 ]]
 
 gvjar.extra_jars += [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
     'constants.jar',
     'gecko-mozglue.jar',
     'gecko-util.jar',
@@ -800,9 +760,6 @@ gbjar.sources += ['java/org/mozilla/gecko/' + x for x in [
 android_package_dir = CONFIG['ANDROID_PACKAGE_NAME'].replace('.', '/')
 gbjar.generated_sources = [] # Keep it this way.
 gbjar.extra_jars += [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
     'constants.jar'
 ]
 if CONFIG['MOZ_ANDROID_GCM']:
@@ -986,9 +943,6 @@ gtjar.sources += [ thirdparty_source_dir + f for f in [
     'com/squareup/picasso/Utils.java'
 ] ]
 gtjar.extra_jars = [
-    CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
 ]
 
 if not CONFIG['MOZILLA_OFFICIAL']:
@@ -1032,7 +986,7 @@ if CONFIG['MOZ_INSTALL_TRACKING']:
         'com/adjust/sdk/UnitTestActivity.java',
         'com/adjust/sdk/Util.java'
     ] ]
-    adjustjar.extra_jars += [
+    adjustjar.extra_jars += androidx_jars + [
         'sync-thirdparty.jar',
     ]
 
@@ -1112,10 +1066,7 @@ if CONFIG['MOZ_ANDROID_SEARCH_ACTIVITY']:
     search_activity = add_java_jar('search-activity')
     search_activity.sources += [search_source_dir + '/' + f for f in search_activity_sources]
     search_activity.javac_flags += ['-Xlint:all', '-Xlint:-deprecation']
-    search_activity.extra_jars = [
-        CONFIG['ANDROID_SUPPORT_ANNOTATIONS_JAR_LIB'],
-        CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-        CONFIG['ANDROID_SUPPORT_V4_AAR_INTERNAL_LIB'],
+    search_activity.extra_jars = androidx_jars + [
         'constants.jar',
         'gecko-R.jar',
         'gecko-browser.jar',
@@ -1141,3 +1092,8 @@ gbjar.sources += ['generated/org/mozilla/gecko/' + x for x in [
     'media/IMediaDrmBridgeCallbacks.java',
     'media/IMediaManager.java',
 ]]
+
+for _jar in [constants_jar, resjar, mgjar, gujar, stjar, services_jar,
+             gvjar, gbjar, gtjar]:
+    _jar.extra_jars += androidx_jars
+

@@ -15,8 +15,8 @@ import org.mozilla.gecko.sync.net.AuthHeaderProvider;
 import org.mozilla.gecko.sync.repositories.delegates.RepositorySessionCreationDelegate;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * A Server11Repository implements fetching and storing against the Sync 1.1 API.

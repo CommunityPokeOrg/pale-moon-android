@@ -12,9 +12,9 @@ import org.mozilla.gecko.home.activitystream.ActivityStreamHomeFragment;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentStatePagerAdapter;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentStatePagerAdapter;
 import android.view.ViewGroup;
 
 import java.util.ArrayList;

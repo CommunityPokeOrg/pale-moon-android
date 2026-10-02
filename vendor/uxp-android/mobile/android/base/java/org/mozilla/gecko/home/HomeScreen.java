@@ -1,8 +1,8 @@
 package org.mozilla.gecko.home;
 
 import android.os.Bundle;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.LoaderManager;
+import androidx.fragment.app.FragmentManager;
+import androidx.loader.app.LoaderManager;
 import android.view.View;
 
 import org.mozilla.gecko.animation.PropertyAnimator;

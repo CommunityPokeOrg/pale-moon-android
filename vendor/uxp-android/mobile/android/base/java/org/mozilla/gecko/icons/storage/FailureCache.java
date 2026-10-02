@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons.storage;
 
 import android.os.SystemClock;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 import android.util.LruCache;
 
 /**

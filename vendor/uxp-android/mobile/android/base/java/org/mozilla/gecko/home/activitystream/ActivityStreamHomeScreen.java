@@ -6,8 +6,8 @@ package org.mozilla.gecko.home.activitystream;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.LoaderManager;
+import androidx.fragment.app.FragmentManager;
+import androidx.loader.app.LoaderManager;
 import android.util.AttributeSet;
 
 import org.mozilla.gecko.animation.PropertyAnimator;

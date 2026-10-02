@@ -6,7 +6,7 @@ package org.mozilla.gecko;
 
 import android.content.ComponentName;
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 
 public abstract class GeckoActivity extends AppCompatActivity implements GeckoActivityStatus {
     // has this activity recently started another Gecko activity?

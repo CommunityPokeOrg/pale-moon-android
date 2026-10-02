@@ -11,7 +11,7 @@ import org.mozilla.gecko.util.FloatUtils;
 import org.mozilla.gecko.util.ThreadUtils;
 
 import android.graphics.PointF;
-import android.support.v4.view.ViewCompat;
+import androidx.core.view.ViewCompat;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.animation.LinearInterpolator;

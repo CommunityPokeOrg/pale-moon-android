@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons;
 
 import android.content.Context;
-import android.support.annotation.CheckResult;
+import androidx.annotation.CheckResult;
 
 /**
  * Entry point for loading icons for websites (just high quality icons, can be favicons or

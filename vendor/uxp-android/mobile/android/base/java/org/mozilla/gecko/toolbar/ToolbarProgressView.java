@@ -16,7 +16,7 @@
 
 package org.mozilla.gecko.toolbar;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.AppConstants.Versions;
 import org.mozilla.gecko.R;
 import org.mozilla.gecko.widget.themed.ThemedImageView;

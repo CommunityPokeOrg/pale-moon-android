@@ -6,11 +6,11 @@
 package org.mozilla.gecko;
 
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v7.media.MediaControlIntent;
-import android.support.v7.media.MediaRouteSelector;
-import android.support.v7.media.MediaRouter;
-import android.support.v7.media.MediaRouter.RouteInfo;
+import androidx.fragment.app.Fragment;
+import androidx.mediarouter.media.MediaControlIntent;
+import androidx.mediarouter.media.MediaRouteSelector;
+import androidx.mediarouter.media.MediaRouter;
+import androidx.mediarouter.media.MediaRouter.RouteInfo;
 import android.util.Log;
 
 import com.google.android.gms.cast.CastMediaControlIntent;

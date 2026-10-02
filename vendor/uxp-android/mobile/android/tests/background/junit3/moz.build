@@ -13,9 +13,7 @@ include('background_junit3_sources.mozbuild')
 
 jar = add_java_jar('background-junit3')
 jar.sources += background_junit3_sources
-jar.extra_jars += [
-    CONFIG['ANDROID_SUPPORT_V4_AAR_LIB'],
-    CONFIG['ANDROID_RECYCLERVIEW_V7_AAR_LIB'],
+jar.extra_jars += (CONFIG['ANDROIDX_EXTRA_JARS'].split() if CONFIG['ANDROIDX_EXTRA_JARS'] else []) + [
     TOPOBJDIR + '/mobile/android/base/constants.jar',
     TOPOBJDIR + '/mobile/android/base/gecko-R.jar',
     TOPOBJDIR + '/mobile/android/base/gecko-browser.jar',
@@ -28,7 +26,7 @@ jar.extra_jars += [
 ]
 
 if CONFIG['MOZ_ANDROID_MLS_STUMBLER']:
-    jar.extra_jars += [
+    jar.extra_jars += (CONFIG['ANDROIDX_EXTRA_JARS'].split() if CONFIG['ANDROIDX_EXTRA_JARS'] else []) + [
         TOPOBJDIR + '/mobile/android/stumbler/stumbler.jar',
     ]
 

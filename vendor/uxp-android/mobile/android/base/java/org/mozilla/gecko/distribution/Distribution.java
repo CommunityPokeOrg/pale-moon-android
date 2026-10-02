@@ -50,7 +50,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.WorkerThread;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 

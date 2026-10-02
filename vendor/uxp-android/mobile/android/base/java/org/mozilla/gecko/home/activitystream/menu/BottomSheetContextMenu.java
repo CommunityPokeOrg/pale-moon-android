@@ -5,10 +5,10 @@
 package org.mozilla.gecko.home.activitystream.menu;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.design.widget.BottomSheetBehavior;
-import android.support.design.widget.BottomSheetDialog;
-import android.support.design.widget.NavigationView;
+import androidx.annotation.NonNull;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.navigation.NavigationView;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;

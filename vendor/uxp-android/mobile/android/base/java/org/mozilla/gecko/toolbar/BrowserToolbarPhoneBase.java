@@ -7,7 +7,7 @@ package org.mozilla.gecko.toolbar;
 
 import java.util.Arrays;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.R;
 import org.mozilla.gecko.Tab;
 import org.mozilla.gecko.Telemetry;

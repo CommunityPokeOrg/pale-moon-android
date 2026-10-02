@@ -10,8 +10,8 @@ import org.mozilla.gecko.animation.PropertyAnimator;
 import org.mozilla.gecko.util.ThreadUtils;
 
 import android.content.Context;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.helper.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import android.util.AttributeSet;
 import android.view.View;
 

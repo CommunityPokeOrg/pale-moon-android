@@ -5,8 +5,8 @@
 
 package org.mozilla.gecko.dlc.catalog;
 
-import android.support.v4.util.ArrayMap;
-import android.support.v4.util.AtomicFile;
+import androidx.collection.ArrayMap;
+import androidx.core.util.AtomicFile;
 
 import org.junit.Assert;
 import org.junit.Assume;

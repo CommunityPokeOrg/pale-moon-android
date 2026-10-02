@@ -6,7 +6,7 @@ package org.mozilla.gecko.fxa;
 
 import android.accounts.Account;
 import android.content.Context;
-import android.support.annotation.UiThread;
+import androidx.annotation.UiThread;
 
 /**
  * Interface definition for a callback to be invoked when an sync status change.

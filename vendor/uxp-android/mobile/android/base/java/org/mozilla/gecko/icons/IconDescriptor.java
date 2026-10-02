@@ -5,9 +5,9 @@
 
 package org.mozilla.gecko.icons;
 
-import android.support.annotation.IntDef;
-import android.support.annotation.Nullable;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 /**
  * A class describing the location and properties of an icon that can be loaded.

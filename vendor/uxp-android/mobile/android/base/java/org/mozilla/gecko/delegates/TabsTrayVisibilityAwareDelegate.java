@@ -6,7 +6,7 @@
 package org.mozilla.gecko.delegates;
 
 import android.os.Bundle;
-import android.support.annotation.CallSuper;
+import androidx.annotation.CallSuper;
 
 import org.mozilla.gecko.BrowserApp;
 import org.mozilla.gecko.tabs.TabsPanel;

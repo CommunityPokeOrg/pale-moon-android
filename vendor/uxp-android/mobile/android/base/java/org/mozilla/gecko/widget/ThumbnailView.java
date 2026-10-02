@@ -12,7 +12,7 @@ import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.widget.themed.ThemedImageView;
 
 /* Special version of ImageView for thumbnails. Scales a thumbnail so that it maintains its aspect

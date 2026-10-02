@@ -5,7 +5,7 @@
 package org.mozilla.gecko.sync.repositories.uploaders;
 
 import android.net.Uri;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.sync.InfoConfiguration;

@@ -8,8 +8,8 @@ package org.mozilla.gecko.icons.storage;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.support.annotation.CheckResult;
-import android.support.annotation.Nullable;
+import androidx.annotation.CheckResult;
+import androidx.annotation.Nullable;
 import android.util.Log;
 
 import com.jakewharton.disklrucache.DiskLruCache;

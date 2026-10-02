@@ -16,8 +16,8 @@ import org.mozilla.gecko.widget.DateTimePicker;
 
 import android.content.Context;
 import android.content.res.Configuration;
-import android.support.design.widget.TextInputLayout;
-import android.support.v7.widget.AppCompatCheckBox;
+import com.google.android.material.textfield.TextInputLayout;
+import androidx.appcompat.widget.AppCompatCheckBox;
 import android.text.Html;
 import android.text.InputType;
 import android.text.TextUtils;

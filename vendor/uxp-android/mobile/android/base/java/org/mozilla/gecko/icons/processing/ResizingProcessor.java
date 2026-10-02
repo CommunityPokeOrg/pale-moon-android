@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons.processing;
 
 import android.graphics.Bitmap;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 
 import org.mozilla.gecko.icons.IconRequest;
 import org.mozilla.gecko.icons.IconResponse;

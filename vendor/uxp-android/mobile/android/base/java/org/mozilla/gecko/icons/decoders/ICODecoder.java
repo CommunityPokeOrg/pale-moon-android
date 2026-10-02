@@ -6,7 +6,7 @@ package org.mozilla.gecko.icons.decoders;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.support.annotation.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
 import android.util.SparseArray;
 
 import java.util.Iterator;

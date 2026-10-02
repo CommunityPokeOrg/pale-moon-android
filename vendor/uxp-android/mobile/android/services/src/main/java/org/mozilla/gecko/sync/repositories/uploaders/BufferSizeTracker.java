@@ -4,8 +4,8 @@
 
 package org.mozilla.gecko.sync.repositories.uploaders;
 
-import android.support.annotation.CallSuper;
-import android.support.annotation.CheckResult;
+import androidx.annotation.CallSuper;
+import androidx.annotation.CheckResult;
 
 /**
  * Implements functionality shared by BatchMeta and Payload objects, namely:

@@ -8,7 +8,7 @@ package org.mozilla.gecko.dlc;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.support.v4.net.ConnectivityManagerCompat;
+import androidx.core.net.ConnectivityManagerCompat;
 import android.util.Log;
 
 import org.mozilla.gecko.AppConstants;

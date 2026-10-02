@@ -6,8 +6,8 @@
 package org.mozilla.gecko.dlc;
 
 import android.content.Context;
-import android.support.v4.util.ArrayMap;
-import android.support.v4.util.AtomicFile;
+import androidx.collection.ArrayMap;
+import androidx.core.util.AtomicFile;
 
 import org.json.JSONArray;
 import org.json.JSONException;

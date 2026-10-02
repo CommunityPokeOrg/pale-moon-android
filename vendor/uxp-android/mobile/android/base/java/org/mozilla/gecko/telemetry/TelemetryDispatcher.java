@@ -7,7 +7,7 @@
 package org.mozilla.gecko.telemetry;
 
 import android.content.Context;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.WorkerThread;
 import android.util.Log;
 import org.mozilla.gecko.telemetry.pingbuilders.TelemetryCorePingBuilder;
 import org.mozilla.gecko.telemetry.schedulers.TelemetryUploadScheduler;

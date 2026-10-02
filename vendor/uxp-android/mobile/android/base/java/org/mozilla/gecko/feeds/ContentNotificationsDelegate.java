@@ -7,8 +7,8 @@ package org.mozilla.gecko.feeds;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.app.NotificationManagerCompat;
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationManagerCompat;
 
 import org.mozilla.gecko.AppConstants;
 import org.mozilla.gecko.BrowserApp;

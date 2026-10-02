@@ -34,11 +34,11 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.WifiLock;
 import android.os.Environment;
 import android.provider.Settings;
-import android.support.v4.app.NotificationManagerCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.net.ConnectivityManagerCompat;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationCompat.Builder;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.net.ConnectivityManagerCompat;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationCompat.Builder;
 import android.util.Log;
 
 import java.io.BufferedInputStream;

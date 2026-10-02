@@ -4,7 +4,7 @@
 
 package org.mozilla.search;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import org.mozilla.gecko.GeckoAppShell;
 import org.mozilla.gecko.Locales;
 import org.mozilla.gecko.R;

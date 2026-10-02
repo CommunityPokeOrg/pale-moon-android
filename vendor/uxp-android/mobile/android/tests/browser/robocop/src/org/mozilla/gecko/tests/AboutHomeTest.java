@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import org.mozilla.gecko.Actions;
 import org.mozilla.gecko.home.HomePager;
 
-import android.support.v4.view.ViewPager;
-import android.support.v7.widget.RecyclerView;
+import androidx.viewpager.widget.ViewPager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;

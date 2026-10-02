@@ -11,7 +11,7 @@ import android.app.DownloadManager;
 import android.content.ContentProviderClient;
 import android.os.Environment;
 import android.os.Process;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import android.graphics.Rect;
 
@@ -138,11 +138,11 @@ import android.nfc.NfcEvent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.StrictMode;
-import android.support.design.widget.Snackbar;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.view.MenuItemCompat;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.core.app.NotificationCompat;
+import androidx.core.view.MenuItemCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Base64;

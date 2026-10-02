@@ -5,7 +5,7 @@
 
 package org.mozilla.gecko.home;
 
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import org.mozilla.gecko.R;
 
 import android.content.Context;

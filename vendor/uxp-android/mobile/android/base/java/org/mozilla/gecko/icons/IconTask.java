@@ -6,7 +6,7 @@
 package org.mozilla.gecko.icons;
 
 import android.graphics.Bitmap;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.util.Log;
 
 import org.mozilla.gecko.AppConstants;

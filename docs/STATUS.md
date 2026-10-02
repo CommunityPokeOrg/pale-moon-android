@@ -1,6 +1,8 @@
 # Status
 
-_Last updated: 2026-10-01 (APK rebranded to **New Moon** — package `org.palemoon.community`, label "New Moon", `newmoon-52.6.0` APK — installs, launches, and now **renders composited page content on-screen**: the presentation pipeline works end-to-end (raster → tiles → TextureHost → DrawQuad → EGL swap → BLAST surface → display), screenshot-verified with a red test page showing "RED TEST 123" under the Fennec chrome. Three separate surface-pipeline defects were root-caused and fixed; one interim workaround (on-top z-order) is documented below)._
+_Last updated: 2026-10-02 (**androidx migration landed**: the entire Java frontend was migrated off the legacy `android.support.*` libraries onto androidx (~38 AARs fetched from Google's maven repo into `$ANDROID_HOME/extras/androidx/m2repository`, resolved by `build/autoconf/android.m4` into `ANDROIDX_EXTRA_JARS`/`ANDROIDX_EXTRA_RES_DIRS`/`ANDROIDX_EXTRA_PACKAGES`). All jars compile, and the resulting APK now needs multidex — `MOZ_ANDROID_MIN_SDK_VERSION` was bumped 15→21 so D8 auto-partitions into `classes.dex`/`classes2.dex`/`classes3.dex` (the APK assembler and package manifest were updated to carry all dex files). Verified on the emulator: BrowserApp displays, TLS handshake + cert verification work, the OpenGL compositor initializes, and no class-loading failures occur. Gradle remains make-driven; the Gradle path is still unused.)_
+
+_Previously (2026-10-01): APK rebranded to **New Moon** — package `org.palemoon.community`, label "New Moon", `newmoon-52.6.0` APK — installs, launches, and now **renders composited page content on-screen**: the presentation pipeline works end-to-end (raster → tiles → TextureHost → DrawQuad → EGL swap → BLAST surface → display), screenshot-verified with a red test page showing "RED TEST 123" under the Fennec chrome. Three separate surface-pipeline defects were root-caused and fixed; one interim workaround (on-top z-order) is documented below._
 
 ## Verified
 
@@ -43,13 +45,16 @@ _Last updated: 2026-10-01 (APK rebranded to **New Moon** — package `org.palemo
     layout: only the custom-linker loader libs live under lib/).
   - `assets/arm64-v8a/`: `libxul.so` + all NSS/NSPR/sqlite/etc. —
     extracted and loaded at runtime by mozglue's custom linker.
-  - `classes.dex` (~7.5 MB, produced by d8), `assets/omni.ja` (~6.4 MB,
-    includes `chrome/chrome/content/browser.xul` + 38 XUL/XBL files —
+  - `classes.dex` + `classes2.dex` + `classes3.dex` (~10 MB total,
+    produced by D8 with `--min-api 21` auto-multidex; the androidx
+    frontend pushed the app past the 64K-method limit),
+    `assets/omni.ja` (~6.4 MB, includes
+    `chrome/chrome/content/browser.xul` + 38 XUL/XBL files —
     the full Fennec XUL frontend), 1183 `res/` drawables.
   - `apksigner verify --verbose --print-certs`: **Verifies** with
     v1+v2+v3 schemes (CN=Android Debug cert from `~/.android/debug.keystore`).
   - aapt badging: package `org.palemoon.community`, versionName
-    `52.6.0`, minSdk 15, targetSdk 23; application-label "New Moon".
+    `52.6.0`, minSdk 21, targetSdk 23; application-label "New Moon".
 
 ## What patch 0003 changes
 
@@ -425,6 +430,12 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
   chrome), not the XUL platform.
 - Support-library AAR `extra_jars` that resolve to `None` are still
   filtered in the backend; androidx/Gradle frontend rework not done.
+  (Superseded: androidx now resolved via `ANDROIDX_EXTRA_JARS`.)
+- AndroidX migration verified on-device (2026-10-02): multidex APK
+  installs and launches; BrowserApp displays, TLS + compositor + tabs
+  all work; no ClassNotFound/VerifyError. The legacy
+  play-services AARs remain compile-time-only (not bundled), so cast/
+  install-referrer features are stubs — by design.
 - `ANDROID_TOOLS` maps to the SDK `emulator/` dir (no `tools/` dir in
   modern SDKs).
 - Two benign packaging warnings remain: "nothing matches overlay file
@@ -454,8 +465,15 @@ ndk_translation). No /dev/kvm → TCG software CPU, cold boot ~8 min.
    branding + Pale Moon app GUID/UA); official "Pale Moon" branding
    needs Moonchild's permission and remains available via
    `MOZ_OFFICIAL_BRANDING_DIRECTORY`.
-3. Java frontend SDK modernization (targetSdk, Gradle 8, API 34) —
-   replace make-driven javac/aapt + support libs with androidx + Gradle.
+3. ~~Java frontend androidx migration~~ — **done** (2026-10-02):
+   all `android.support.*` references rewritten to androidx (~80-rule
+   migration script, `scripts/migrate-androidx.py`), support libs
+   replaced by ~38 androidx AARs (`scripts/fetch-androidx.sh`),
+   multidex enabled via minSdk 21, all three dex files packaged.
+   Remaining in this area: Gradle 8 build path (make-driven
+   javac/aapt2/D8 still does the build; `gradle/` is vestigial),
+   targetSdk 23→34 (requires runtime-permission handling), and a
+   stale `android.support.v4.app.Fragment` keep in proguard.cfg.
 4. Desktop Pale Moon browser chrome (`browser/` XUL) on Android, if the
    mobile Fennec chrome is deemed insufficient for the "full Pale Moon
    UI" goal — large effort; the Fennec chrome is already XUL/XBL and

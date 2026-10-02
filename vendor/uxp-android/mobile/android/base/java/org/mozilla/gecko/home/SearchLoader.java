@@ -16,9 +16,9 @@ import android.content.Context;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.app.LoaderManager.LoaderCallbacks;
-import android.support.v4.content.Loader;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.app.LoaderManager.LoaderCallbacks;
+import androidx.loader.content.Loader;
 
 /**
  * Encapsulates the implementation of the search cursor loader.

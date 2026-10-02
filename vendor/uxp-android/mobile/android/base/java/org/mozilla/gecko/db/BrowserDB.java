@@ -22,7 +22,7 @@ import android.content.Context;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.graphics.drawable.BitmapDrawable;
-import android.support.v4.content.CursorLoader;
+import androidx.loader.content.CursorLoader;
 
 /**
  * Interface for interactions with all databases. If you want an instance

@@ -75,10 +75,10 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceGroup;
 import android.preference.SwitchPreference;
 import android.preference.TwoStatePreference;
-import android.support.design.widget.Snackbar;
-import android.support.design.widget.TextInputLayout;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.ActionBar;
+import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.textfield.TextInputLayout;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.appcompat.app.ActionBar;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -347,7 +347,7 @@ OnSharedPreferenceChangeListener
 
         // We must call this before setTitle to avoid crashes. Most devices don't seem to care
         // (we used to call onCreate later), however the ASUS TF300T (running 4.2) crashes
-        // with an NPE in android.support.v7.app.AppCompatDelegateImplV7.ensureSubDecor(), and it's
+        // with an NPE in androidx.appcompat.app.AppCompatDelegateImpl.ensureSubDecor(), and it's
         // likely other strange devices (other Asus devices, some Samsungs) could do the same.
         super.onCreate(savedInstanceState);
 
