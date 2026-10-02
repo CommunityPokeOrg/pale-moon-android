@@ -559,7 +559,12 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   captures is now identified: it is Android's
   `DeprecatedTargetSdkVersionDialog` (the system warns that the app
   targets SDK 23), not a Gecko-composited element — it disappears
-  once tapped through. `chromehidden=''`, `delayedStartupFinished=true`,
+  once tapped through. Java "Tab:Load" notifications with
+  `newTab=true` now call `gBrowser.addTab(url)` + `selectedTab`
+  instead of clobbering the current tab (verified:
+  `PMXW-TabLoad: added https://example.com` in logcat and a second
+  real "New Tab" entry in the desktop tab strip). Buffered loads
+  flush with their full args. `chromehidden=''`, `delayedStartupFinished=true`,
   `#navigator-toolbox` 375x118 (menubar 25px + nav-bar 38px +
   PersonalToolbar 31px + TabsToolbar 25px), `#appcontent`/`#browser`
   375x501 below it, status-bar at bottom. Screenshot-verified: File/
