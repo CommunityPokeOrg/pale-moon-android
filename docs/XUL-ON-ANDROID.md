@@ -117,8 +117,23 @@ surface — the fix that unblocked it was stopping PM's command-line
 handler from opening a second browser window alongside the appshell's.
 The remaining gap is adaptation, not feasibility: menus/keyboard/hover/
 window-management, the second-window paths (dialogs, window.open), and
-routing Java-side intent URLs into PM's tab model instead of Fennec's
-Tab:Load events.
+real tab creation (the Java tab model and PM's `gBrowser` are currently
+independent; intent URLs land in the current tab via `loadURI`).
+
+**2026-10-02 second update: intent routing works.** Java VIEW intents
+reach the desktop chrome: `nsBrowserGlue` buffers Fennec `Tab:Load`
+observer notifications from app-startup (they can fire minutes before
+any chrome window exists on the emulator) and calls
+`gBrowser.loadURI` once a `navigator:browser` window is up. Verified
+cold-start: `PMXW-TabLoad: loaded https://example.com` → chrome
+progress listeners (`onLocationChange`, `onSecurityChange`) → content
+rasterization. Startup is now error-free apart from benign leftovers
+(weave/syncui gated off, default-browser check skipped, urlbar editor
+guard, `ssl_domain_display` pref added, bookmarks.html packaged).
+One caveat for real devices: verification ran with JIT disabled —
+ndk_translation (x86_64 emulator translating aarch64) deadlocks
+inside `FlushGuestCodeCache` during JIT bursts; this is an emulator
+artifact, not a platform limitation.
 
 ## Current stance
 

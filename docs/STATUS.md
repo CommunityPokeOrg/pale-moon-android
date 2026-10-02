@@ -438,18 +438,55 @@ as the app chrome on Android instead of the Fennec mobile chrome.
   response for our version parsed), PlacesCategoriesStarter,
   nsPlacesExpiration, FormHistory, PlacesDBUtils, Sqlite — a genuine
   Pale Moon backend session.
-- Residual non-fatal errors to clean up: `TypeError: win is null`
-  (nsBrowserGlue.js:714 — likely a getMostRecentBrowserWindow during
-  early startup), `defaults/profile/bookmarks.html` missing so the
-  first-run bookmark import reports failure (PM's vendor profile dir
-  ships no bookmarks.html), an IndexedDB maintenance NS_ERROR, a
-  `browser-clh` contract→CID warning (Fennec's `be623d20` BrowserCLH
-  CID stays in merged components.manifest while its impl is excluded —
-  benign), a moz-icon gtk warning, and a GMPInstallManager lazy-import
-  failure.
 - Interactivity is entirely unadapted (menubar→Android, window.open,
   hover, keyboard shortcuts, toolbox layout at phone width); see
   docs/XUL-ON-ANDROID.md for the mapping assessment.
+
+**Verified since (2026-10-02, intent routing + startup cleanup):**
+
+- **Java VIEW intents now navigate the desktop chrome.** The Java
+  frontend dispatches Fennec-style `Tab:Load` observer notifications;
+  `nsBrowserGlue` (an `app-startup` component, instantiated before the
+  Gecko event loop processes Java-posted events) observes them,
+  buffers URLs until a `navigator:browser` window exists, and calls
+  `gBrowser.loadURI` on the current tab. Verified on a cold-start
+  VIEW intent: `PMXW-TabLoad: loaded https://example.com` followed by
+  `onLocationChange`/`onSecurityChange` in the desktop `browser.js`
+  chrome progress listeners and content rasterization (`TilePixels`
+  per-tile uploads + `EndFrame` readbacks). Earlier window-level
+  bridging lost cold-start loads — the notification fires minutes
+  before the chrome window exists on this emulator; buffering in glue
+  fixes that class of race permanently.
+- Fixed residual errors, all verified gone in logcat: `TypeError:
+  win is null` (default-browser check skipped on Android — there is
+  no desktop shell service), `defaults/profile/bookmarks.html`
+  FILE_NOT_FOUND (minimal bookmarks.html now vendored into
+  `palemoon/app/profile` and packaged), Weave `TypeError` aborting
+  `_delayedStartup` (`gSyncUI.init` gated — `@mozilla.org/weave/service;1`
+  is not built on Android), `this.editor is null` in
+  urlbarBindings `formatValue` (guard added), and
+  `browser.identity.ssl_domain_display` NS_ERROR_UNEXPECTED in
+  `setIdentityMessages` (pref added to `newmoon-branding.js`, matching
+  the desktop brandings' shared `preferences.inc`).
+- `updateCurrentBrowser` `TypeError: newBrowser is undefined`
+  (tabbrowser.xml) sidestepped: the bridge loads into the current tab
+  rather than calling `selectedTab=` on a new tab, so the failing
+  selection path is not exercised. The underlying cause — a tab whose
+  `linkedBrowser` is unset when the tabbox selection fires — remains
+  open and will matter once real tab creation is wired up (the
+  Java-side tab model and PM's `gBrowser` are currently independent).
+- Emulator-only workaround documented: ndk_translation deadlocks
+  nondeterministically inside `FlushGuestCodeCache`'s mutex during
+  JIT compile bursts (verified via `debuggerd -b` stacks — both the
+  `MprotectForGuest/HandleHostSignal` and `RunKernelSyscall` paths).
+  Disabling `javascript.options.ion`, `baselinejit`, and
+  `native_regexp` via a profile `user.js` makes startup reliably
+  reach paint (~7 min). Test-only; not shipped in the APK, and not
+  needed on real arm64 hardware.
+- Remaining known errors are harmless: IndexedDB maintenance
+  NS_ERROR_NOT_AVAILABLE, browser-clh contract→CID warning (benign),
+  moz-icon gtk warning, GMPInstallManager lazy-import, snippets CDN
+  fetch failure (endpoint does not serve this product — expected).
 
 ## Unverified / partial (honest caveats)
 
@@ -578,11 +615,14 @@ as the app chrome on Android instead of the Fennec mobile chrome.
    javac/aapt2/D8 still does the build; `gradle/` is vestigial),
    targetSdk 23→34 (requires runtime-permission handling), and a
    stale `android.support.v4.app.Fragment` keep in proguard.cfg.
-4. **First paint of the desktop chrome window** (see the Desktop
-   chrome section): instrument why the loaded `browser.xul` document
-   never issues a frame (refresh driver / frame-tree build vs.
-   `browser.js` startup stall vs. emulator starvation), then fix.
-   After that: Android-ize the desktop chrome's interaction model
-   (menubar→overflow menu, no hover/keyboard deps, toolbox layout at
-   phone width).
+4. ~~First paint of the desktop chrome window~~ — **done**
+   (2026-10-02): the loaded `browser.xul` issues frames end-to-end
+   (`PaintRoot` → `TilePixels` → `DrawQuad` → `EndFrame`), and VIEW
+   intents route through `nsBrowserGlue` into `gBrowser.loadURI`.
+   Remaining: real tab creation (Java tab model ↔ `gBrowser`), the
+   `updateCurrentBrowser` linkedBrowser race, Android-izing the
+   desktop chrome's interaction model (menubar→overflow menu, no
+   hover/keyboard deps, toolbox layout at phone width), and the
+   surface-ordering question — the composited Gecko surface draws the
+   chrome but the Fennec Java UI layer still occupies the window.
 5. Release signing path + l10n/crashreporter overrides audit.

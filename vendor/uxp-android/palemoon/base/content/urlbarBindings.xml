@@ -167,6 +167,13 @@
           if (!this._formattingEnabled || this.focused)
             return;
 
+#ifdef MOZ_WIDGET_ANDROID
+          // The URL bar's editor may not exist yet when location changes
+          // arrive very early on Android.
+          if (!this.editor)
+            return;
+#endif
+
           let controller = this.editor.selectionController;
           let selection = controller.getSelection(controller.SELECTION_URLSECONDARY);
           selection.removeAllRanges();

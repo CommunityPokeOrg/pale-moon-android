@@ -21,6 +21,10 @@ var gSyncUI = {
   _unloaded: false,
 
   init: function() {
+#ifdef MOZ_WIDGET_ANDROID
+    // Weave is not built on Android.
+    return;
+#endif
     // Proceed to set up the UI if Sync has already started up.
     // Otherwise we'll do it when Sync is firing up.
     let xps = Components.classes["@mozilla.org/weave/service;1"]

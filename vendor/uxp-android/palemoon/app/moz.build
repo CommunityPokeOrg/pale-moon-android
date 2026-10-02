@@ -26,6 +26,7 @@ if CONFIG['OS_TARGET'] != 'Android':
         'ua-update.json'
     ]
 FINAL_TARGET_FILES.defaults += ['permissions']
+FINAL_TARGET_FILES.defaults.profile += ['profile/bookmarks.html']
 FINAL_TARGET_FILES.defaults.profile += ['profile/prefs.js']
 
 DEFINES['APP_VERSION'] = CONFIG['MOZ_APP_VERSION']

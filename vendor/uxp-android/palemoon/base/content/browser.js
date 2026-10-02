@@ -999,6 +999,11 @@ var gBrowserInit = {
     this._boundDelayedStartup = this._delayedStartup.bind(this, mustLoadSidebar);
     window.addEventListener("MozAfterPaint", this._boundDelayedStartup);
 
+#ifdef MOZ_WIDGET_ANDROID
+    // Java VIEW-intent/URL loads arrive as "Tab:Load" observer
+    // notifications; nsBrowserGlue routes them into gBrowser.
+#endif
+
     this._loadHandled = true;
   },
 

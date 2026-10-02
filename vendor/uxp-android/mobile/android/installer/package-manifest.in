@@ -580,6 +580,9 @@
 @BINPATH@/components/PageIconProtocolHandler.js
 @BINPATH@/components/nsPlacesAutoComplete.js
 @BINPATH@/components/nsPlacesAutoComplete.manifest
+
+; default bookmarks imported on first run
+@BINPATH@/defaults/profile/bookmarks.html
 #endif
 
 @BINPATH@/components/XPIDialogService.js

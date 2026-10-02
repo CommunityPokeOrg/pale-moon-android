@@ -168,7 +168,15 @@ BrowserGlue.prototype = {
       case "browser-delayed-startup-finished":
         this._onFirstWindowLoaded();
         Services.obs.removeObserver(this, "browser-delayed-startup-finished");
+#ifdef MOZ_WIDGET_ANDROID
+        this._flushPendingTabLoads(subject);
+#endif
         break;
+#ifdef MOZ_WIDGET_ANDROID
+      case "Tab:Load":
+        this._onTabLoad(data);
+        break;
+#endif
       case "sessionstore-windows-restored":
         this._onWindowsRestored();
         break;
@@ -369,6 +377,13 @@ BrowserGlue.prototype = {
     os.addObserver(this, "profile-after-change", false);
     os.addObserver(this, "browser-search-engine-modified", false);
     os.addObserver(this, "browser-search-service", false);
+#ifdef MOZ_WIDGET_ANDROID
+    // Java delivers navigation requests (VIEW intents, the location bar)
+    // as Fennec-style "Tab:Load" observer notifications, which can arrive
+    // long before any browser window exists. Buffer them from app-startup.
+    this._pendingTabLoads = [];
+    os.addObserver(this, "Tab:Load", false);
+#endif
     Services.prefs.addObserver(PREF_INTERNAL_USERSCRIPTS_ENABLED, this, false);
   },
 
@@ -630,6 +645,43 @@ BrowserGlue.prototype = {
   },
 
   // the first browser window has finished initializing
+#ifdef MOZ_WIDGET_ANDROID
+  _onTabLoad: function(data) {
+    try {
+      let args = JSON.parse(data);
+      if (!args.url) {
+        return;
+      }
+      let win = Services.wm.getMostRecentWindow("navigator:browser");
+      if (win && win.gBrowser) {
+        // Navigate the current tab; the desktop chrome's tab-strip
+        // machinery is not adapted to Android.
+        win.gBrowser.loadURI(args.url);
+        Services.console.logStringMessage("PMXW-TabLoad: loaded " + args.url);
+      } else {
+        this._pendingTabLoads.push(args.url);
+        Services.console.logStringMessage("PMXW-TabLoad: buffered " + args.url);
+      }
+    } catch (e) {
+      Cu.reportError(e);
+    }
+  },
+
+  _flushPendingTabLoads: function(win) {
+    if (!this._pendingTabLoads || !this._pendingTabLoads.length) {
+      return;
+    }
+    let url = this._pendingTabLoads[this._pendingTabLoads.length - 1];
+    this._pendingTabLoads.length = 0;
+    try {
+      win.gBrowser.loadURI(url);
+      Services.console.logStringMessage("PMXW-TabLoad: flushed " + url);
+    } catch (e) {
+      Cu.reportError(e);
+    }
+  },
+#endif
+
   _onFirstWindowLoaded: function() {
 #ifdef XP_WIN
     // For Windows, initialize the jump list module.
@@ -695,7 +747,12 @@ BrowserGlue.prototype = {
 
     // Perform default browser checking.
     if (ShellService) {
+#ifdef MOZ_WIDGET_ANDROID
+      // No desktop shell on Android — skip the default-browser prompt.
+      let shouldCheck = false;
+#else
       let shouldCheck = ShellService.shouldCheckDefaultBrowser;
+#endif
 
       const skipDefaultBrowserCheck =
         Services.prefs.getBoolPref("browser.shell.skipDefaultBrowserCheckOnFirstRun") &&
